@@ -79,8 +79,6 @@ Thumbs.db
 # Telegram session fayllari - barcha session fayllarni ignore qilish
 **/*.session
 **/session*.session
-telegramuploader/session*.session
-telegramuploader/*.session
 # Fayl manager va media fayllar
 **/*.mp4
 **/*.avi
