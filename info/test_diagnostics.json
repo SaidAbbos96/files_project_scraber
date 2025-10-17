@@ -1,0 +1,81 @@
+{
+  "session_start": 1760638661.840597,
+  "stats": {
+    "total_attempts": 5,
+    "successful_uploads": 0,
+    "failed_uploads": 5,
+    "rate_limit_errors": 0,
+    "flood_limit_errors": 0,
+    "corruption_errors": 0,
+    "auth_errors": 0,
+    "connection_errors": 0,
+    "unknown_errors": 5,
+    "total_wait_time": 0.0,
+    "average_upload_time": 0.0
+  },
+  "recent_errors": [
+    {
+      "timestamp": 1760638661.8406296,
+      "filename": "video_0.mp4",
+      "file_size": 52428800,
+      "error_type": "unknown_error",
+      "error_message": "Test error 0",
+      "full_traceback": "Traceback...",
+      "duration_seconds": 2.0,
+      "retry_count": 0
+    },
+    {
+      "timestamp": 1760638661.84236,
+      "filename": "video_1.mp4",
+      "file_size": 52428800,
+      "error_type": "unknown_error",
+      "error_message": "Test error 1",
+      "full_traceback": "Traceback...",
+      "duration_seconds": 3.0,
+      "retry_count": 0
+    },
+    {
+      "timestamp": 1760638661.8500926,
+      "filename": "video_2.mp4",
+      "file_size": 52428800,
+      "error_type": "unknown_error",
+      "error_message": "Test error 2",
+      "full_traceback": "Traceback...",
+      "duration_seconds": 4.0,
+      "retry_count": 0
+    },
+    {
+      "timestamp": 1760638661.8506413,
+      "filename": "video_3.mp4",
+      "file_size": 52428800,
+      "error_type": "unknown_error",
+      "error_message": "Test error 3",
+      "full_traceback": "Traceback...",
+      "duration_seconds": 5.0,
+      "retry_count": 0
+    },
+    {
+      "timestamp": 1760638661.85111,
+      "filename": "video_4.mp4",
+      "file_size": 52428800,
+      "error_type": "unknown_error",
+      "error_message": "Test error 4",
+      "full_traceback": "Traceback...",
+      "duration_seconds": 6.0,
+      "retry_count": 0
+    }
+  ],
+  "summary": {
+    "total_errors": 5,
+    "recent_errors": 5,
+    "error_types": {
+      "unknown_error": 5
+    },
+    "most_common_error": "unknown_error",
+    "total_wait_time": 0.0,
+    "session_duration": 0.010583639144897461
+  },
+  "recommendations": [
+    "⚠️ Muvaffaqiyatsizlik ko'p - konfiguratsiyani tekshiring"
+  ]
+}

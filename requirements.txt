@@ -1,0 +1,36 @@
+# 🎯 Files Project Scraber - Required Dependencies
+# Optimized for Python 3.12+
+
+# Core async HTTP libraries
+aiohttp>=3.12.0,<4.0.0
+anyio>=4.10.0
+
+# Web scraping and browser automation  
+playwright>=1.55.0
+beautifulsoup4>=4.14.0
+
+# Telegram client library
+Telethon>=1.41.0
+
+# Progress bars and UI enhancements
+tqdm>=4.67.0
+
+# Text processing and Uzbek language support
+UzTransliterator>=0.0.36
+
+# Environment variables management
+python-dotenv>=1.0.0
+
+# Note: The following are built-in Python modules (no installation needed):
+# - sqlite3 (database)
+# - logging (logging system)  
+# - pathlib (path handling)
+# - datetime (date/time utilities)
+# - json (JSON processing)
+# - asyncio (async programming)
+# - urllib (URL utilities)
+# - typing (type hints)
+# - os (operating system interface)
+# - copy (object copying)
+# - time (time utilities)
+# - concurrent.futures (concurrent execution)

@@ -1,0 +1,80 @@
+SITE_CONFIGS = {
+    "asilmedia": {
+        "base_url": "http://asilmedia.org/films/tarjima_kinolar/",
+        "pagination_selector": "#bottom-nav > div.navigation.fx-row.fx-start > a:last-child",
+        "pagination_link": "http://asilmedia.org/films/tarjima_kinolar/page/{page}/",
+        "pagination_pages": False,  # avtomatik aniqlash  yoki 700
+        "card_selector": "#dle-content .moviebox",
+        "fields": {
+            "title": "h1.title::text",
+            "categories": "div.full-body > div > div:nth-child(1) > span:nth-child(2)::text",
+            "description": "div.full-body article::text | div.full-body p.full-text::text",
+            "file_url": "#download1 div a:last-of-type::attr(href) | #download1 div a:last-child::attr(href)",
+            "image": "img.img-fit::attr(src) | img.img-fit::attr(data-src)",
+            "file_page": None,
+            "image": "img.img-fit::attr(src) | img.img-fit::attr(data-src)",
+            "year": "#dle-content > article > div > div.fullcol > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(1) > span.fullmeta-seclabel::text",
+            "country": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(2) > span.fullmeta-seclabel::text",
+            "actors": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-body.mb-4 > div > div:nth-child(3) > span:nth-child(2)::text",
+        },
+    },
+    "asilmedia_multfilm": {
+        "base_url": "http://asilmedia.org/films/multfilmlar_multiklar/",
+        "pagination_selector": "#bottom-nav > div.navigation.fx-row.fx-start > a:last-child",
+        "pagination_link": "http://asilmedia.org/films/multfilmlar_multiklar/page/{page}/",
+        "pagination_pages": False,
+        "card_selector": "#dle-content .moviebox",
+        "fields": {
+            "title": "h1.title::text",
+            "categories": "div.full-body > div > div:nth-child(1) > span:nth-child(2)::text",
+            "description": "div.full-body article::text | div.full-body p.full-text::text",
+            "file_url": "#download1 div a:last-of-type::attr(href) | #download1 div a:last-child::attr(href)",
+            "file_page": None,
+            "image": "img.img-fit::attr(src) | img.img-fit::attr(data-src)",
+            "year": "#dle-content > article > div > div.fullcol > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(1) > span.fullmeta-seclabel::text",
+            "country": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(2) > span.fullmeta-seclabel::text",
+            "actors": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-body.mb-4 > div > div:nth-child(3) > span:nth-child(2)::text",
+        },
+    },
+    "daxshat_net_tarjima": {
+        "base_url": "https://new.daxshat.net/kinolar/tarjima-kinolar/",
+        "pagination_link": "https://new.daxshat.net/kinolar/tarjima-kinolar/page/{page}/",
+        "pagination_selector": "#pagination .pagination__inner a:last-child",
+        "pagination_pages": False,
+        "card_selector": "#dle-content .movie-item",
+        "fields": {
+            "title": "h1.inner-page__title::text",
+            "meta": ".inner-page__desc .inner-page__text::text",
+            "categories": "meta:Janr",
+            "country": "meta:Mamlakat",
+            "year": "meta:Ishlab chiqarilgan yili",
+            "language": "meta:Tarjima 1",
+            "actors": "meta:Rollarda",
+            "description": "meta:Ta'rif",
+            "file_url": "article.inner-page__main a.btn[href$=\".mp4\"]::attr(href)",
+            "file_page": None,
+            "image": "article.inner-page__main .inner-page__img img::attr(src)"
+        }
+    },
+
+    "ruhub_me": {
+        # https://go4.ruhab.online/latest-updates/
+        "base_url": "https://go4.ruhab.online/top-rated/",
+        "pagination_selector": None,
+        "pagination_link": "https://go4.ruhab.online/top-rated/{page}/",
+        "pagination_pages": 135,
+        "card_selector": "#list_videos_common_videos_list_items",
+        "fields": {
+            "title": ".video-title-holder h1::text",
+            "categories": "div.full-body > div > div:nth-child(1) > span:nth-child(2)::text",
+            "language": None,
+            "description": "div.full-body article::text | div.full-body p.full-text::text",
+            "file_url": ".download-holder a:last-child::attr(href)",
+            "file_page": None,
+            "image": "img.img-fit::attr(src) | img.img-fit::attr(data-src)",
+            "year": "#dle-content > article > div > div.fullcol > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(1) > span.fullmeta-seclabel::text",
+            "country": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-bot.mb-4 > div > div:nth-child(2) > span.fullmeta-seclabel::text",
+            "actors": "#dle-content > article > div > div.fullcol.flx.mb-4 > div.fullcol-right.flx-fx.order-last > div.full-body.mb-4 > div > div:nth-child(3) > span:nth-child(2)::text",
+        },
+    },
+}

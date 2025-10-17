@@ -1,0 +1,116 @@
+# IDE va editor papkalari
+**/.idea/
+**/.vscode/
+**/.code/
+
+# Python cache va build fayllari
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+**/.Python
+**/build/
+**/develop-eggs/
+**/dist/
+
+**/eggs/
+**/.eggs/
+**/lib/
+**/lib64/
+**/parts/
+**/sdist/
+**/var/
+**/wheels/
+**/*.egg-info/
+**/.installed.cfg
+**/*.egg
+**/pip-wheel-metadata/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.coverage
+**/.coveragerc
+**/htmlcov/
+**/.tox/
+**/.env
+**/env/
+**/venv/
+**/.venv/
+**/ENV/
+**/env.bak/
+**/venv.bak/
+
+# Jupyter notebook checkpoints
+**/.ipynb_checkpoints/
+
+# Log fayllar
+**/*.log
+
+# MacOS va Linux tizim fayllari
+.DS_Store
+Thumbs.db
+
+# Docker va boshqa servis fayllari
+**/docker-compose.override.yml
+**/docker-compose.local.yml
+
+# Database backup va migration fayllari
+**/*.sqlite3
+# **/*.db
+**/*.backup
+#**/migrations/
+**/local_files.db
+
+
+#bizga serverda kkmas filelar
+# Ignore all files inside any downloads/ folder but allow a .keep file so the folder is tracked
+**/downloads/*
+!**/downloads/.keep
+
+**/logs/*
+!**/logs/.keep
+
+# Test natijalari va cache
+**/.pytest_cache/
+**/.cache/
+**/coverage.xml
+**/nosetests.xml
+**/test-results/
+
+# Telegram session fayllari - barcha session fayllarni ignore qilish
+**/*.session
+**/session*.session
+telegramuploader/session*.session
+telegramuploader/*.session
+# Fayl manager va media fayllar
+**/*.mp4
+**/*.avi
+**/*.mkv
+**/*.mov
+**/*.flv
+**/*.wmv
+**/*.mp3
+**/*.wav
+**/*.flac
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.gif
+**/*.bmp
+**/*.svg
+
+# Node.js va npm fayllari (agar kerak bo‘lsa)
+**/node_modules/
+**/npm-debug.log*
+**/yarn-error.log*
+
+# Alembic migration versions
+mainbot/app/database/migrations/versions/*
+!mainbot/app/database/migrations/versions/.keep
+
+# Backup va temp fayllar
+*~
+*.swp
+*.bak
+*.tmp
+*.temp
+
