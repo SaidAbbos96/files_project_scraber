@@ -28,7 +28,7 @@ class TelegramUploaderOrchestrator:
         self.config = config
 
         # Core components
-        self.downloader = FileDownloader(timeout=7200)  # 2 hours (4GB fayllar uchun)
+        self.downloader = FileDownloader(base_timeout=7200, max_retries=3)  # Enhanced downloader
         self.uploader = TelegramUploader(timeout=7200)   # 2 hours
         # StreamingUploader - agar config da telegram_group bo'lmasa, default ishlatadi
         self.stream_uploader = StreamingUploader(
