@@ -138,9 +138,12 @@ class FileDB:
     def delete_files(self, config_name):
         conn = self._connect()
         c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?", (config_name,))
+        count = c.fetchone()[0]
         c.execute("DELETE FROM files WHERE config_name=?", (config_name,))
         conn.commit()
         conn.close()
+        return count
 
     def file_exists(self, config_name: str, file_page: str) -> bool:
         conn = self._connect()
@@ -152,3 +155,24 @@ class FileDB:
         exists = c.fetchone() is not None
         conn.close()
         return exists
+
+    def get_files_count(self, config_name: str) -> int:
+        """Bitta config'dagi jami fayllar sonini qaytarish"""
+        conn = self._connect()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?", (config_name,))
+        count = c.fetchone()[0]
+        conn.close()
+        return count
+
+    def get_downloaded_files_count(self, config_name: str) -> int:
+        """Yuklangan fayllar sonini qaytarish (local_path mavjud)"""
+        conn = self._connect()
+        c = conn.cursor()
+        c.execute(
+            "SELECT COUNT(*) FROM files WHERE config_name=? AND local_path IS NOT NULL AND local_path != ''",
+            (config_name,)
+        )
+        count = c.fetchone()[0]
+        conn.close()
+        return count
