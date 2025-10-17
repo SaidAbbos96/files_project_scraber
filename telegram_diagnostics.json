@@ -1,0 +1,51 @@
+{
+  "session_start": 1760712068.4237447,
+  "stats": {
+    "total_attempts": 2,
+    "successful_uploads": 0,
+    "failed_uploads": 2,
+    "rate_limit_errors": 0,
+    "flood_limit_errors": 0,
+    "corruption_errors": 0,
+    "auth_errors": 0,
+    "connection_errors": 0,
+    "unknown_errors": 2,
+    "total_wait_time": 0.0,
+    "average_upload_time": 0.0
+  },
+  "recent_errors": [
+    {
+      "timestamp": 1760712068.6704164,
+      "filename": "unknown",
+      "file_size": 0,
+      "error_type": "unknown_error",
+      "error_message": "Path error: 'local_path'",
+      "full_traceback": "'local_path'",
+      "duration_seconds": 2.8848648071289062e-05,
+      "retry_count": 0
+    },
+    {
+      "timestamp": 1760712068.9931042,
+      "filename": "unknown",
+      "file_size": 0,
+      "error_type": "unknown_error",
+      "error_message": "Path error: 'local_path'",
+      "full_traceback": "'local_path'",
+      "duration_seconds": 3.123283386230469e-05,
+      "retry_count": 0
+    }
+  ],
+  "summary": {
+    "total_errors": 2,
+    "recent_errors": 2,
+    "error_types": {
+      "unknown_error": 2
+    },
+    "most_common_error": "unknown_error",
+    "total_wait_time": 0.0,
+    "session_duration": 0.5694091320037842
+  },
+  "recommendations": [
+    "⚠️ Muvaffaqiyatsizlik ko'p - konfiguratsiyani tekshiring"
+  ]
+}

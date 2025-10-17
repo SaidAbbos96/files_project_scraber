@@ -22,15 +22,12 @@ import time
 class StreamingUploader:
     """Faylni streaming orqali Telegram ga yuklash"""
 
-    def __init__(self, default_group: str = FILES_GROUP_LINK, timeout: int = 7200):
+    def __init__(self, default_group: str = FILES_GROUP_LINK):
         """
         Args:
             default_group: Default Telegram group (default: FILES_GROUP_LINK)
-            timeout: Upload timeout (default: 2 hours)
         """
         self.default_group = default_group or FILES_GROUP_LINK
-        self.timeout = timeout
-        self.timeout = timeout
         self.temp_dir = Path(tempfile.gettempdir()) / "telegram_stream"
         self.temp_dir.mkdir(exist_ok=True)
 
@@ -188,19 +185,19 @@ class StreamingUploader:
             # 3. Telegram ga yuklash
             logger.info(f"📤 Telegram upload boshlandi...")
 
-            async with asyncio.timeout(self.timeout):
-                with tqdm(total=total_size, unit="B", unit_scale=True, desc=f"📤 {temp_file.name}") as bar:
+            # 📤 Timeout yo'q - muvaffaqiyatli streaming upload to'xtatilmasin
+            with tqdm(total=total_size, unit="B", unit_scale=True, desc=f"📤 {temp_file.name}") as bar:
 
-                    def progress(sent, total):
-                        bar.n = sent
-                        bar.total = total
-                        bar.refresh()
+                def progress(sent, total):
+                    bar.n = sent
+                    bar.total = total
+                    bar.refresh()
 
-                    await Telegram_client.send_file(
-                        entity,
-                        str(temp_file),
-                        caption=caption,
-                        parse_mode="html",
+                await Telegram_client.send_file(
+                    entity,
+                    str(temp_file),
+                    caption=caption,
+                    parse_mode="html",
                         supports_streaming=True,
                         progress_callback=progress,
                     )
@@ -208,9 +205,7 @@ class StreamingUploader:
             logger.info(f"✅ Telegram upload tugadi")
             return True
 
-        except asyncio.TimeoutError:
-            logger.error(f"⏰ Timeout: {self.timeout//60} daqiqa")
-            return False
+
         except Exception as e:
             logger.error(f"❌ Download/Upload xatosi: {e}")
             return False

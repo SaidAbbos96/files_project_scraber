@@ -26,14 +26,12 @@ if parent_dir not in sys.path:
 class TelegramUploader:
     """Telegramga fayl yuborish uchun class"""
 
-    def __init__(self, default_group: str = FILES_GROUP_LINK, timeout: int = 7200):
+    def __init__(self, default_group: str = FILES_GROUP_LINK):
         """
         Args:
             default_group: Default Telegram group
-            timeout: Upload timeout in seconds (default: 2 hours)
         """
         self.default_group = default_group
-        self.timeout = timeout
 
     def get_video_attributes(self, file_path: str) -> Optional[DocumentAttributeVideo]:
         """Video fayl uchun attributes olish - Enhanced version"""
@@ -156,6 +154,106 @@ class TelegramUploader:
             logger.warning(f"⚠️ Smart default error: {e}")
             return self._get_default_video_attributes()
 
+    def validate_video_file(self, file_path: str) -> tuple[bool, str]:
+        """
+        Video faylni telegramga yuborishdan avval tekshirish
+        
+        Args:
+            file_path: Video fayl path'i
+            
+        Returns:
+            (is_valid, reason) tuple
+        """
+        if not os.path.exists(file_path):
+            return False, "Fayl topilmadi"
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            return False, "Fayl bo'sh"
+        
+        if file_size < 1024:  # 1KB
+            return False, "Fayl juda kichik (1KB dan kam)"
+        
+        # Video format tekshirish
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext not in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']:
+            logger.warning(f"⚠️ Noma'lum video format: {file_ext}")
+        
+        # FFprobe bilan video stream tekshirish
+        try:
+            import subprocess
+            import json
+            
+            for cmd in ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe']:
+                try:
+                    result = subprocess.run([
+                        cmd, '-v', 'quiet', '-print_format', 'json', 
+                        '-show_streams', file_path
+                    ], capture_output=True, text=True, timeout=15, check=True)
+                    
+                    data = json.loads(result.stdout)
+                    streams = data.get('streams', [])
+                    
+                    # Video stream mavjudligini tekshirish
+                    video_streams = [s for s in streams if s.get('codec_type') == 'video']
+                    if not video_streams:
+                        return False, "Video stream topilmadi"
+                    
+                    video_stream = video_streams[0]
+                    
+                    # Asosiy parametrlarni tekshirish
+                    width = video_stream.get('width')
+                    height = video_stream.get('height')
+                    
+                    if not width or not height:
+                        return False, "Video o'lchamlari aniqlanmadi"
+                    
+                    if width < 64 or height < 64:
+                        return False, f"Video juda kichik: {width}x{height}"
+                    
+                    if width > 4096 or height > 4096:
+                        return False, f"Video juda katta: {width}x{height}"
+                    
+                    # Codec tekshirish
+                    codec = video_stream.get('codec_name', 'unknown')
+                    if codec in ['prores', 'rawvideo']:
+                        logger.warning(f"⚠️ Telegram uchun optimal emas codec: {codec}")
+                    
+                    # Duration tekshirish
+                    duration = float(video_stream.get('duration', 0))
+                    if duration > 0:
+                        if duration < 1:
+                            return False, f"Video juda qisqa: {duration:.1f}s"
+                        if duration > 14400:  # 4 hours
+                            logger.warning(f"⚠️ Juda uzun video: {duration/3600:.1f}h")
+                    
+                    logger.info(f"✅ Video validation OK: {width}x{height}, {codec}, {duration:.1f}s")
+                    return True, f"Video valid: {width}x{height}, {codec}"
+                    
+                except subprocess.CalledProcessError as e:
+                    logger.debug(f"🔄 ffprobe {cmd} failed: {e}")
+                    continue
+                except json.JSONDecodeError as e:
+                    logger.debug(f"🔄 JSON parse error: {e}")
+                    continue
+                except Exception as e:
+                    logger.debug(f"🔄 ffprobe {cmd} error: {e}")
+                    continue
+            
+            # FFprobe ishlamasa, basic file validation
+            logger.warning("⚠️ FFprobe ishlamadi, basic validation")
+            if file_size > 100 * 1024:  # 100KB dan katta bo'lsa OK deb hisoblaymiz
+                return True, "Basic validation: fayl hajmi normal"
+            else:
+                return False, "Fayl juda kichik va FFprobe ishlamadi"
+                
+        except Exception as e:
+            logger.error(f"❌ Video validation critical error: {e}")
+            # Critical error bo'lsa ham, katta fayllarni o'tkazamiz
+            if file_size > 1024 * 1024:  # 1MB+
+                return True, "Validation error, lekin fayl katta - o'tkazildi"
+            return False, f"Validation error: {e}"
+
     def _get_default_video_attributes(self) -> DocumentAttributeVideo:
         """Default video attributes qaytarish"""
         return DocumentAttributeVideo(
@@ -216,6 +314,21 @@ class TelegramUploader:
                     filename, size, "File not found", f"File does not exist: {output_path}", duration)
                 return False
 
+            # 🎬 Video validation - telegramga yuborishdan avval tekshirish
+            file_ext = Path(output_path).suffix.lower()
+            if file_ext in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']:
+                logger.info(f"🎬 Video fayl validation: {filename}")
+                is_valid, reason = self.validate_video_file(output_path)
+                
+                if not is_valid:
+                    duration = time.time() - start_time
+                    logger.error(f"❌ Video validation failed: {reason}")
+                    diagnostics.log_error(
+                        filename, size, "Invalid video", f"Video validation failed: {reason}", duration)
+                    return False
+                else:
+                    logger.info(f"✅ Video validation passed: {reason}")
+
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
 
@@ -232,34 +345,33 @@ class TelegramUploader:
                 f"✅ Guruh aniqlandi: {getattr(entity, 'title', str(entity))} !")
             logger.info(f"📤 Telegram send_file ishga tushmoqda...")
 
-            # ⏰ Timeout bilan upload
-            async with asyncio.timeout(self.timeout):
-                with tqdm(total=size, unit="B", unit_scale=True, desc=f"📤 {filename}") as bar:
+            # 📤 Timeout siz upload - muvaffaqiyatli yuklashni to'xtatmaymiz
+            with tqdm(total=size, unit="B", unit_scale=True, desc=f"📤 {filename}") as bar:
 
-                    def progress(sent, total_size):
-                        bar.n = sent
-                        bar.total = total_size
-                        bar.refresh()
+                def progress(sent, total_size):
+                    bar.n = sent
+                    bar.total = total_size
+                    bar.refresh()
 
-                    # Video fayl uchun attributes tayyorlash
-                    attributes = None
-                    if self.is_video_file(filename):
-                        video_attr = self.get_video_attributes(output_path)
-                        if video_attr:
-                            attributes = [video_attr]
-                            logger.info(
-                                f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
+                # Video fayl uchun attributes tayyorlash
+                attributes = None
+                if self.is_video_file(filename):
+                    video_attr = self.get_video_attributes(output_path)
+                    if video_attr:
+                        attributes = [video_attr]
+                        logger.info(
+                            f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
 
-                    await Telegram_client.send_file(
-                        entity,
-                        output_path,
-                        caption=caption,
-                        parse_mode="html",
-                        supports_streaming=True,  # 🔑 video sifatida yuboriladi
-                        progress_callback=progress,
-                        attributes=attributes,  # 🎬 Video attributes qo'shish
-                        force_document=False,   # Video'ni video sifatida yuborish
-                    )
+                await Telegram_client.send_file(
+                    entity,
+                    output_path,
+                    caption=caption,
+                    parse_mode="html",
+                    supports_streaming=True,  # 🔑 video sifatida yuboriladi
+                    progress_callback=progress,
+                    attributes=attributes,  # 🎬 Video attributes qo'shish
+                    force_document=False,   # Video'ni video sifatida yuborish
+                )
 
             duration = time.time() - start_time
             logger.info(
@@ -269,15 +381,7 @@ class TelegramUploader:
             diagnostics.log_success(filename, duration)
             return True
 
-        except asyncio.TimeoutError:
-            duration = time.time() - start_time
-            error_msg = f"Timeout: {filename} telegramga yuklash {self.timeout//60} daqiqadan oshdi"
-            logger.error(f"⏰ {error_msg}")
 
-            # Timeout error ni diagnostics ga qayd qilish
-            diagnostics.log_error(filename, size, error_msg,
-                                  "TimeoutError", duration)
-            return False
         except Exception as e:
             import traceback
             duration = time.time() - start_time
