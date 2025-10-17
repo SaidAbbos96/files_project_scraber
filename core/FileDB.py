@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from typing import List, Dict, Any, Optional
 from core.config import DB_PATH
 
 
@@ -145,6 +146,46 @@ class FileDB:
         conn.close()
         return count
 
+    def get_undownloaded_files(self, config_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Yuklanmagan fayllarni olish (local_path bo'sh bo'lganlar)
+        
+        Args:
+            config_name: Config nomi
+            limit: Maksimal fayllar soni
+            
+        Returns:
+            List of undownloaded files
+        """
+        conn = self._connect()
+        c = conn.cursor()
+        
+        # Base query - yuklanmagan va file_url mavjud bo'lgan fayllar
+        query = """
+            SELECT * FROM files 
+            WHERE config_name=? 
+            AND (local_path IS NULL OR local_path = '')
+            AND file_url IS NOT NULL 
+            AND file_url != ''
+            AND file_url NOT LIKE '%t.me%'
+            ORDER BY id
+        """
+        
+        if limit:
+            query += f" LIMIT {limit}"
+            
+        c.execute(query, (config_name,))
+        results = c.fetchall()
+        conn.close()
+        
+        # Convert to dict format
+        files = []
+        columns = [desc[0] for desc in c.description]
+        for row in results:
+            file_dict = dict(zip(columns, row))
+            files.append(file_dict)
+            
+        return files
+
     def file_exists(self, config_name: str, file_page: str) -> bool:
         conn = self._connect()
         c = conn.cursor()
@@ -208,9 +249,9 @@ class FileDB:
         )
         reset_count = c.fetchone()[0]
         
-        # Uploaded statusni reset qilish
+        # Uploaded statusni reset qilish (faqat uploaded=1 bo'lgan fayllarni)
         c.execute(
-            "UPDATE files SET uploaded=0, uploaded_at=NULL WHERE config_name=?",
+            "UPDATE files SET uploaded=0, uploaded_at=NULL WHERE config_name=? AND uploaded=1",
             (config_name,)
         )
         

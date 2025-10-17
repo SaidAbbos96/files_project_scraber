@@ -16,7 +16,7 @@ class FileDownloaderDB:
     
     def get_files_for_download(self, site_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
-        Download uchun fayllarni olish (faqat local_path bo'sh bo'lganlar)
+        Download uchun fayllarni olish (faqat yuklanmagan fayllar)
         
         Args:
             site_name: Site name
@@ -25,18 +25,10 @@ class FileDownloaderDB:
         Returns:
             List of files ready for download
         """
-        all_files = self.db.get_files(site_name)
+        # To'g'ridan-to'g'ri database'dan yuklanmagan fayllarni olish
+        download_needed = self.db.get_undownloaded_files(site_name, limit)
         
-        # Faqat download qilinmagan fayllarni filter qilish
-        download_needed = [
-            f for f in all_files 
-            if not f.get("local_path") and f.get("file_url") and "https://t.me/" not in f.get("file_url", "")
-        ]
-        
-        if limit:
-            download_needed = download_needed[:limit]
-        
-        logger.info(f"📂 {len(download_needed)} fayl download uchun tayyor")
+        logger.info(f"📂 {len(download_needed)} fayl download uchun tayyor (yuklanmagan)")
         return download_needed
     
     def update_download_success(self, file_id: int, local_path: str, file_size: int) -> bool:
