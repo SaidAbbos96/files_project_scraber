@@ -102,10 +102,12 @@ BROWSER_CONFIG = {
 
 # Environment variables'dan Telegram konfiguratsiyasini o'qish
 TELEGRAM_API_ID = int(os.getenv("TELEGRAM_API_ID", "28837519"))
-TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "e22cefa35ca74ad27a92bceebd1291b3")
+TELEGRAM_API_HASH = os.getenv(
+    "TELEGRAM_API_HASH", "e22cefa35ca74ad27a92bceebd1291b3")
 TELEGRAM_PHONE = os.getenv("TELEGRAM_PHONE", "+998200089990")
 FILES_GROUP_ID = os.getenv("TELEGRAM_FILES_GROUP_ID", "-1002699309226")
-FILES_GROUP_LINK = os.getenv("TELEGRAM_FILES_GROUP_LINK", "https://t.me/+GGzAizSJb-g0MzQy")
+FILES_GROUP_LINK = os.getenv(
+    "TELEGRAM_FILES_GROUP_LINK", "https://t.me/+GGzAizSJb-g0MzQy")
 
 
 def make_config(site_config, overrides=None):
