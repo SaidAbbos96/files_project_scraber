@@ -36,78 +36,124 @@ class TelegramUploader:
         self.timeout = timeout
 
     def get_video_attributes(self, file_path: str) -> Optional[DocumentAttributeVideo]:
-        """Video fayl uchun attributes olish"""
+        """Video fayl uchun attributes olish - Enhanced version"""
         try:
-            import ffmpeg
             import subprocess
+            import json
+            import ffmpeg
 
-            # ffprobe path'ini topish - avval system, keyin imageio-ffmpeg
-            ffprobe_path = None
-
-            # 1. Avval system ffprobe'ni tekshiramiz (ko'pincha mavjud va tez)
-            for path in ['/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'ffprobe']:
-                try:
-                    subprocess.run([path, '-version'], capture_output=True, check=True, timeout=5)
-                    ffprobe_path = path
-                    logger.info(f"🔍 System ffprobe: {ffprobe_path}")
-                    break
-                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-                    continue
-
-            # 2. Agar system ffprobe yo'q bo'lsa, imageio-ffmpeg'dan foydalanish
-            if not ffprobe_path:
-                try:
-                    import imageio_ffmpeg
-                    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-                    if ffmpeg_path and os.path.exists(ffmpeg_path):
-                        # ffmpeg binary'dan ffprobe path yasash
-                        potential_ffprobe = ffmpeg_path.replace('ffmpeg', 'ffprobe')
-                        
-                        # Agar ffprobe fayl mavjud bo'lsa
-                        if os.path.exists(potential_ffprobe):
-                            ffprobe_path = potential_ffprobe
-                            logger.info(f"🔍 imageio-ffmpeg ffprobe: {ffprobe_path}")
-                        else:
-                            # ffmpeg'ni ffprobe sifatida ishlatish (ffmpeg -i ... bilan ham ma'lumot olish mumkin)
-                            logger.warning(f"⚠️ ffprobe topilmadi: {potential_ffprobe}")
-                            logger.info("🔄 ffmpeg'ni probe uchun ishlatamiz")
-                            ffprobe_path = ffmpeg_path
-                except ImportError:
-                    logger.warning("⚠️ imageio-ffmpeg topilmadi")
-                except Exception as e:
-                    logger.warning(f"⚠️ imageio-ffmpeg xato: {e}")
-
-            if not ffprobe_path:
-                logger.warning(
-                    "⚠️ ffprobe topilmadi, default attributes ishlatiladi")
-                return self._get_default_video_attributes()
-
-            # Video info olish
-            probe = ffmpeg.probe(file_path, cmd=ffprobe_path)
-            video_stream = next(
-                (stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-
-            if video_stream:
-                width = int(video_stream.get('width', 1280))
-                height = int(video_stream.get('height', 720))
-                duration = float(probe.get('format', {}).get('duration', 0))
-
-                logger.info(f"📹 Video info: {width}x{height}, {duration:.1f}s")
-
-                # Video attributes yaratish
+            # Multiple methods to get video info
+            
+            # Method 1: Direct subprocess with system tools
+            video_info = self._get_video_info_direct(file_path)
+            if video_info:
+                logger.info(f"📹 Direct method: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
                 return DocumentAttributeVideo(
-                    duration=int(duration),
-                    w=width,
-                    h=height,
+                    duration=int(video_info['duration']),
+                    w=video_info['width'],
+                    h=video_info['height'],
                     supports_streaming=True,
                     round_message=False
                 )
-            else:
-                logger.warning("⚠️ Video stream topilmadi")
-                return self._get_default_video_attributes()
+            
+            # Method 2: ffmpeg-python library
+            video_info = self._get_video_info_ffmpeg_python(file_path)
+            if video_info:
+                logger.info(f"� ffmpeg-python: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
+                return DocumentAttributeVideo(
+                    duration=int(video_info['duration']),
+                    w=video_info['width'],
+                    h=video_info['height'],
+                    supports_streaming=True,
+                    round_message=False
+                )
+
+            # Method 3: Fallback to default with some intelligence
+            logger.warning("⚠️ Video info olib bo'lmadi, default attributes")
+            return self._get_smart_default_attributes(file_path)
 
         except Exception as e:
-            logger.warning(f"⚠️ Video attributes olishda xato: {e}")
+            logger.error(f"❌ Video attributes critical error: {e}")
+            return self._get_smart_default_attributes(file_path)
+
+    def _get_video_info_direct(self, file_path: str) -> Optional[dict]:
+        """Direct subprocess bilan video info olish"""
+        try:
+            import subprocess
+            import json
+            
+            # 1. System ffprobe
+            for cmd in ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe']:
+                try:
+                    result = subprocess.run([
+                        cmd, '-v', 'quiet', '-print_format', 'json', 
+                        '-show_format', '-show_streams', file_path
+                    ], capture_output=True, text=True, timeout=10, check=True)
+                    
+                    data = json.loads(result.stdout)
+                    video_stream = next((s for s in data.get('streams', []) if s.get('codec_type') == 'video'), None)
+                    
+                    if video_stream:
+                        width = int(video_stream.get('width', 1280))
+                        height = int(video_stream.get('height', 720))
+                        duration = float(data.get('format', {}).get('duration', 0))
+                        logger.info(f"✅ Direct ffprobe success: {cmd}")
+                        return {'width': width, 'height': height, 'duration': duration}
+                        
+                except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired) as e:
+                    logger.debug(f"🔄 {cmd} failed: {e}")
+                    continue
+                    
+            return None
+        except Exception as e:
+            logger.debug(f"Direct method error: {e}")
+            return None
+
+    def _get_video_info_ffmpeg_python(self, file_path: str) -> Optional[dict]:
+        """ffmpeg-python library bilan video info olish"""
+        try:
+            import ffmpeg
+            
+            # Try with different ffmpeg/ffprobe paths
+            for ffmpeg_cmd in ['ffprobe', '/usr/bin/ffprobe', 'ffmpeg']:
+                try:
+                    probe = ffmpeg.probe(file_path, cmd=ffmpeg_cmd)
+                    video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+                    
+                    if video_stream:
+                        width = int(video_stream.get('width', 1280))
+                        height = int(video_stream.get('height', 720))
+                        duration = float(probe.get('format', {}).get('duration', 0))
+                        logger.info(f"✅ ffmpeg-python success: {ffmpeg_cmd}")
+                        return {'width': width, 'height': height, 'duration': duration}
+                        
+                except Exception as e:
+                    logger.debug(f"🔄 ffmpeg-python {ffmpeg_cmd} failed: {e}")
+                    continue
+                    
+            return None
+        except Exception as e:
+            logger.debug(f"ffmpeg-python method error: {e}")
+            return None
+
+    def _get_smart_default_attributes(self, file_path: str) -> DocumentAttributeVideo:
+        """Smart default attributes - file size asosida duration taxmin qilish"""
+        try:
+            file_size = os.path.getsize(file_path)
+            # Taxminiy duration = file_size / (1MB/minute) - very rough estimate
+            estimated_duration = max(60, min(7200, file_size // (1024 * 1024)))  # 1min - 2hours
+            
+            logger.info(f"🎬 Smart default: 1280x720, ~{estimated_duration}s (estimated from {file_size/1024/1024:.1f}MB)")
+            
+            return DocumentAttributeVideo(
+                duration=int(estimated_duration),
+                w=1280,
+                h=720,
+                supports_streaming=True,
+                round_message=False
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ Smart default error: {e}")
             return self._get_default_video_attributes()
 
     def _get_default_video_attributes(self) -> DocumentAttributeVideo:

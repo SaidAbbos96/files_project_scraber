@@ -176,3 +176,45 @@ class FileDB:
         count = c.fetchone()[0]
         conn.close()
         return count
+
+    def get_uploaded_files_count(self, config_name: str) -> int:
+        """Telegramga yuklangan fayllar sonini qaytarish"""
+        conn = self._connect()
+        c = conn.cursor()
+        c.execute(
+            "SELECT COUNT(*) FROM files WHERE config_name=? AND uploaded=1",
+            (config_name,)
+        )
+        count = c.fetchone()[0]
+        conn.close()
+        return count
+
+    def reset_uploaded_status(self, config_name: str) -> int:
+        """Bitta config'dagi barcha fayllarning uploaded statusini reset qilish
+        
+        Args:
+            config_name: Config nomi
+            
+        Returns:
+            int: Reset qilingan fayllar soni
+        """
+        conn = self._connect()
+        c = conn.cursor()
+        
+        # Avval nechta fayl reset qilinishini sanash
+        c.execute(
+            "SELECT COUNT(*) FROM files WHERE config_name=? AND uploaded=1",
+            (config_name,)
+        )
+        reset_count = c.fetchone()[0]
+        
+        # Uploaded statusni reset qilish
+        c.execute(
+            "UPDATE files SET uploaded=0, uploaded_at=NULL WHERE config_name=?",
+            (config_name,)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return reset_count

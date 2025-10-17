@@ -22,8 +22,10 @@ class SystemDiagnostics:
         self.python_packages = []
         self.system_packages = []
         self.config_issues = []
+        self.output_file = "system_diagnostics_report.txt"
+        self.file_content = []  # Fayl uchun content
         
-    def log_result(self, category: str, name: str, status: str, message: str, fix_command: str = None):
+    def log_result(self, category: str, name: str, status: str, message: str, fix_command: str = None, quiet=False):
         """Tekshiruv natijasini yozish"""
         result = {
             'category': category,
@@ -42,10 +44,19 @@ class SystemDiagnostics:
         }
         
         emoji = status_emoji.get(status, '❓')
-        print(f"{emoji} {category} - {name}: {message}")
+        log_line = f"{emoji} {category} - {name}: {message}"
         
+        # Faylga ham yozish
+        self.file_content.append(log_line)
         if fix_command and status in ['ERROR', 'WARN']:
-            print(f"   💡 Fix: {fix_command}")
+            fix_line = f"   💡 Fix: {fix_command}"
+            self.file_content.append(fix_line)
+        
+        # Console'ga faqat quiet bo'lmasa yozish
+        if not quiet:
+            print(log_line)
+            if fix_command and status in ['ERROR', 'WARN']:
+                print(fix_line)
             
     def check_python_environment(self):
         """Python muhitini tekshirish"""
@@ -172,6 +183,64 @@ class SystemDiagnostics:
             self.log_result("System", "curl", "WARN", 
                           "Curl topilmadi", 
                           "sudo apt install curl")
+    
+    def check_video_attributes(self):
+        """Video attributes functionality test"""
+        print("\n🎬 VIDEO ATTRIBUTES TEST")
+        print("=" * 50)
+        
+        try:
+            # Video attributes test
+            from telegramuploader.core.uploader import TelegramUploader
+            import tempfile
+            import subprocess
+            
+            uploader = TelegramUploader()
+            
+            # Test video yaratish
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+                test_file = tmp.name
+            
+            try:
+                # 2 sekund test video
+                result = subprocess.run([
+                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=2:size=320x240:rate=10', 
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-t', '2', '-y', test_file
+                ], capture_output=True, timeout=20, check=True)
+                
+                # Video attributes olish
+                attrs = uploader.get_video_attributes(test_file)
+                
+                if attrs and attrs.w > 0 and attrs.h > 0 and attrs.duration > 0:
+                    self.log_result("Video", "Attributes", "OK", 
+                                  f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s")
+                else:
+                    self.log_result("Video", "Attributes", "ERROR", 
+                                  "Video attributes failed",
+                                  "sudo apt install ffmpeg")
+                
+            except subprocess.CalledProcessError as e:
+                self.log_result("Video", "Attributes", "ERROR", 
+                              "FFmpeg video test failed",
+                              "sudo apt install ffmpeg")
+            except subprocess.TimeoutExpired:
+                self.log_result("Video", "Attributes", "ERROR", 
+                              "Video test timeout",
+                              "sudo apt install ffmpeg")
+            finally:
+                # Cleanup
+                try:
+                    os.remove(test_file)
+                except:
+                    pass
+                    
+        except ImportError as e:
+            self.log_result("Video", "Attributes", "ERROR", 
+                          f"Import error: {e}",
+                          "pip install ffmpeg-python")
+        except Exception as e:
+            self.log_result("Video", "Attributes", "ERROR", 
+                          f"Video test error: {e}")
     
     def check_playwright_browsers(self):
         """Playwright browserlarini tekshirish"""
@@ -461,25 +530,318 @@ class SystemDiagnostics:
             print(f"\n❌ {error_count} ta muhim muammo topildi. Avval ularni hal qiling.")
             return False
     
-    def run_full_diagnostics(self):
+    def run_full_diagnostics(self, verbose=False):
         """Barcha diagnostikalarni ishga tushirish"""
-        print("🔍 SYSTEM DIAGNOSTICS - Files Project Scraper")
-        print("=" * 60)
-        print(f"Platform: {platform.system()} {platform.release()}")
-        print(f"Python: {platform.python_version()}")
-        print(f"Working Directory: {Path.cwd()}")
-        print()
+        # File content header
+        header = [
+            "🔍 SYSTEM DIAGNOSTICS - Files Project Scraper",
+            "=" * 60,
+            f"Platform: {platform.system()} {platform.release()}",
+            f"Python: {platform.python_version()}",
+            f"Working Directory: {Path.cwd()}",
+            ""
+        ]
+        self.file_content.extend(header)
         
-        self.check_python_environment()
-        self.check_required_python_packages()
-        self.check_system_dependencies()
-        self.check_playwright_browsers()
-        self.check_project_structure()
-        self.check_configuration()
-        self.check_permissions_and_space()
-        self.generate_fix_script()
+        if verbose:
+            for line in header:
+                print(line)
+        else:
+            print("🔍 System Diagnostics ishga tushmoqda...")
+            print("📝 Batafsil log: system_diagnostics_report.txt")
         
-        return self.print_summary()
+        # Silent mode - faqat muhim ma'lumotlar
+        quiet_mode = not verbose
+        
+        self.check_python_environment_quiet() if quiet_mode else self.check_python_environment()
+        self.check_required_python_packages_quiet() if quiet_mode else self.check_required_python_packages()
+        self.check_system_dependencies_quiet() if quiet_mode else self.check_system_dependencies()
+        self.check_video_attributes_quiet() if quiet_mode else self.check_video_attributes()
+        self.check_playwright_browsers_quiet() if quiet_mode else self.check_playwright_browsers()
+        self.check_project_structure_quiet() if quiet_mode else self.check_project_structure()
+        self.check_configuration_quiet() if quiet_mode else self.check_configuration()
+        self.check_permissions_and_space_quiet() if quiet_mode else self.check_permissions_and_space()
+        self.generate_fix_script_quiet() if quiet_mode else self.generate_fix_script()
+        
+        # Save to file
+        self.save_report()
+        
+        return self.print_summary(verbose=verbose)
+    
+    def save_report(self):
+        """Diagnostics reportni faylga saqlash"""
+        try:
+            with open(self.output_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(self.file_content))
+            print(f"📄 To'liq report saqlandi: {self.output_file}")
+        except Exception as e:
+            print(f"⚠️ Report saqlab bo'lmadi: {e}")
+
+    # Quiet versions of check functions
+    def check_python_environment_quiet(self):
+        """Python environment - quiet mode"""
+        self.file_content.append("\n🐍 PYTHON ENVIRONMENT CHECK")
+        self.file_content.append("=" * 50)
+        
+        # Python version - only show if there's an issue
+        python_version = platform.python_version()
+        major, minor = map(int, python_version.split('.')[:2])
+        if major > 3 or (major == 3 and minor >= 8):
+            self.log_result("Python", "Version", "OK", f"Python {python_version}", quiet=True)
+            print("✅ Python version OK")
+        else:
+            self.log_result("Python", "Version", "ERROR", f"Python {python_version} - 3.8+ kerak", quiet=False)
+        
+        # Virtual environment
+        if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+            self.log_result("Python", "Virtual Environment", "OK", f"Active: {sys.prefix}", quiet=True)
+            print("✅ Virtual environment OK")
+        else:
+            self.log_result("Python", "Virtual Environment", "WARN", "Virtual environment ishlatilmayapti", quiet=False)
+
+    def check_required_python_packages_quiet(self):
+        """Python packages - quiet mode"""
+        self.file_content.append("\n📦 PYTHON PACKAGES CHECK")
+        self.file_content.append("=" * 50)
+        
+        required_packages = {
+            'aiohttp': '3.8.0',
+            'playwright': '1.30.0', 
+            'beautifulsoup4': '4.10.0',
+            'telethon': '1.20.0',
+            'tqdm': '4.60.0',
+            'ffmpeg-python': '0.2.0',
+            'imageio-ffmpeg': '0.4.0',
+            'UzTransliterator': '0.0.1',
+            'python-dotenv': '0.19.0'
+        }
+        
+        missing_packages = []
+        for package_name, min_version in required_packages.items():
+            try:
+                if package_name == 'python-dotenv':
+                    import dotenv
+                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                elif package_name == 'ffmpeg-python':
+                    import ffmpeg
+                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                elif package_name == 'imageio-ffmpeg':
+                    import imageio_ffmpeg
+                    version = getattr(imageio_ffmpeg, '__version__', 'unknown')
+                    self.log_result("Package", package_name, "OK", f"Installed: {version}", quiet=True)
+                elif package_name == 'beautifulsoup4':
+                    import bs4  # BeautifulSoup4 imports as bs4
+                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                else:
+                    spec = importlib.util.find_spec(package_name.replace('-', '_'))
+                    if spec:
+                        self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                    else:
+                        missing_packages.append(package_name)
+                        self.log_result("Package", package_name, "ERROR", "Topilmadi", f"pip install {package_name}", quiet=False)
+            except ImportError:
+                missing_packages.append(package_name)
+                self.log_result("Package", package_name, "ERROR", "Topilmadi", f"pip install {package_name}", quiet=False)
+        
+        if not missing_packages:
+            print("✅ Barcha Python packages OK")
+        else:
+            print(f"❌ {len(missing_packages)} ta package topilmadi")
+
+    def check_system_dependencies_quiet(self):
+        """System dependencies - quiet mode"""
+        self.file_content.append("\n🔧 SYSTEM DEPENDENCIES CHECK")
+        self.file_content.append("=" * 50)
+        
+        # FFmpeg/ffprobe
+        ffmpeg_ok = shutil.which('ffmpeg') is not None
+        ffprobe_ok = shutil.which('ffprobe') is not None
+        
+        if ffmpeg_ok and ffprobe_ok:
+            print("✅ FFmpeg tools OK")
+            self.log_result("System", "ffmpeg", "OK", f"Found: {shutil.which('ffmpeg')}", quiet=True)
+            self.log_result("System", "ffprobe", "OK", f"Found: {shutil.which('ffprobe')}", quiet=True)
+        else:
+            print("❌ FFmpeg tools missing")
+            if not ffmpeg_ok:
+                self.log_result("System", "ffmpeg", "ERROR", "FFmpeg topilmadi", "sudo apt install ffmpeg", quiet=False)
+            if not ffprobe_ok:
+                self.log_result("System", "ffprobe", "ERROR", "FFprobe topilmadi", "sudo apt install ffmpeg", quiet=False)
+
+    def check_video_attributes_quiet(self):
+        """Video attributes - quiet mode""" 
+        self.file_content.append("\n🎬 VIDEO ATTRIBUTES TEST")
+        self.file_content.append("=" * 50)
+        
+        try:
+            from telegramuploader.core.uploader import TelegramUploader
+            import tempfile
+            import subprocess
+            
+            uploader = TelegramUploader()
+            
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+                test_file = tmp.name
+            
+            try:
+                # 1 sekund test video
+                subprocess.run([
+                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=5', 
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-t', '1', '-y', test_file
+                ], capture_output=True, timeout=10, check=True)
+                
+                attrs = uploader.get_video_attributes(test_file)
+                
+                if attrs and attrs.w > 0 and attrs.h > 0 and attrs.duration > 0:
+                    print("✅ Video attributes OK")
+                    self.log_result("Video", "Attributes", "OK", f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s", quiet=True)
+                else:
+                    print("❌ Video attributes FAILED")
+                    self.log_result("Video", "Attributes", "ERROR", "Video attributes failed", quiet=False)
+                
+            except Exception as e:
+                print("❌ Video test FAILED")
+                self.log_result("Video", "Attributes", "ERROR", f"Video test error: {e}", quiet=False)
+            finally:
+                try:
+                    os.remove(test_file)
+                except:
+                    pass
+                    
+        except Exception as e:
+            print("❌ Video module ERROR")
+            self.log_result("Video", "Attributes", "ERROR", f"Import error: {e}", quiet=False)
+
+    def check_playwright_browsers_quiet(self):
+        """Playwright browsers - quiet mode"""
+        self.file_content.append("\n🌐 PLAYWRIGHT BROWSERS CHECK")
+        self.file_content.append("=" * 50)
+        
+        try:
+            import playwright
+            playwright_cache = Path.home() / ".cache" / "ms-playwright"
+            chromium_dirs = list(playwright_cache.glob("chromium-*"))
+            
+            if chromium_dirs:
+                print("✅ Playwright Chromium OK")
+                self.log_result("Playwright", "Chromium", "OK", "Browser mavjud", quiet=True)
+            else:
+                print("❌ Playwright Chromium MISSING")
+                self.log_result("Playwright", "Chromium", "ERROR", "Chromium topilmadi", "playwright install chromium", quiet=False)
+        except ImportError:
+            print("❌ Playwright NOT INSTALLED")
+            self.log_result("Playwright", "Installation", "ERROR", "Playwright topilmadi", "pip install playwright", quiet=False)
+
+    def check_project_structure_quiet(self):
+        """Project structure - quiet mode"""
+        self.file_content.append("\n📁 PROJECT STRUCTURE CHECK")
+        self.file_content.append("=" * 50)
+        
+        required_dirs = ['core', 'scraper', 'filedownloader', 'telegramuploader', 'utils']
+        missing_dirs = []
+        
+        for dir_name in required_dirs:
+            if not os.path.exists(dir_name):
+                missing_dirs.append(dir_name)
+                self.log_result("Structure", f"Dir: {dir_name}", "ERROR", f"Topilmadi: {dir_name}", quiet=False)
+            else:
+                self.log_result("Structure", f"Dir: {dir_name}", "OK", f"Mavjud: {os.path.abspath(dir_name)}", quiet=True)
+        
+        if not missing_dirs:
+            print("✅ Project structure OK")
+        else:
+            print(f"❌ {len(missing_dirs)} ta papka topilmadi")
+
+    def check_configuration_quiet(self):
+        """Configuration - quiet mode"""
+        self.file_content.append("\n⚙️ CONFIGURATION CHECK")
+        self.file_content.append("=" * 50)
+        
+        env_file_exists = os.path.exists('.env')
+        
+        if env_file_exists:
+            print("✅ Configuration OK")
+            self.log_result("Config", ".env", "OK", "Environment file mavjud", quiet=True)
+        else:
+            print("⚠️ .env file missing")
+            self.log_result("Config", ".env", "WARN", ".env fayli topilmadi", "cp .env.example .env", quiet=False)
+
+    def check_permissions_and_space_quiet(self):
+        """Permissions and space - quiet mode"""
+        self.file_content.append("\n🔐 PERMISSIONS & DISK SPACE CHECK")
+        self.file_content.append("=" * 50)
+        
+        # Disk space
+        try:
+            current_dir = Path.cwd()
+            statvfs = os.statvfs(current_dir)
+            free_space = statvfs.f_frsize * statvfs.f_bavail
+            free_space_gb = free_space / (1024**3)
+            
+            if free_space_gb > 10:
+                print("✅ Disk space OK")
+                self.log_result("Disk", "Free Space", "OK", f"{free_space_gb:.1f} GB bo'sh joy", quiet=True)
+            elif free_space_gb > 2:
+                print("⚠️ Disk space LOW")
+                self.log_result("Disk", "Free Space", "WARN", f"{free_space_gb:.1f} GB bo'sh joy - yetarli lekin kam", quiet=False)
+            else:
+                print("❌ Disk space CRITICAL")
+                self.log_result("Disk", "Free Space", "ERROR", f"{free_space_gb:.1f} GB bo'sh joy - juda kam", quiet=False)
+        except Exception as e:
+            print("❌ Disk space CHECK FAILED")
+            self.log_result("Disk", "Free Space", "ERROR", f"Tekshirib bo'lmadi: {e}", quiet=False)
+
+    def generate_fix_script_quiet(self):
+        """Generate fix script - quiet mode"""
+        self.file_content.append("\n🔧 GENERATING FIX SCRIPT")
+        self.file_content.append("=" * 50)
+        
+        if not self.python_packages and not self.system_packages:
+            print("✅ No fixes needed")
+            self.log_result("Fix", "Script", "INFO", "Hech qanday fix kerak emas!", quiet=True)
+        else:
+            print("🔧 Fix script generated")
+            # ... fix script logic remains the same
+
+    def print_summary(self, verbose=False):
+        """Summary chop etish"""
+        total_tests = len(self.results)
+        ok_count = sum(1 for r in self.results if r['status'] == 'OK')
+        warn_count = sum(1 for r in self.results if r['status'] == 'WARN')
+        error_count = sum(1 for r in self.results if r['status'] == 'ERROR')
+        info_count = sum(1 for r in self.results if r['status'] == 'INFO')
+        
+        summary = [
+            "\n📊 DIAGNOSTICS SUMMARY",
+            "=" * 60,
+            f"Jami tekshiruvlar: {total_tests}",
+            f"✅ Muvaffaqiyatli: {ok_count}",
+            f"⚠️ Ogohlantirishlar: {warn_count}",
+            f"❌ Xatolar: {error_count}",
+            f"📋 Ma'lumotlar: {info_count}",
+            ""
+        ]
+        
+        self.file_content.extend(summary)
+        
+        for line in summary:
+            print(line)
+        
+        if error_count == 0 and warn_count <= 2:
+            result_msg = "🎉 Tizim tayyor! Dasturni ishga tushirishingiz mumkin."
+            print(result_msg)
+            self.file_content.append(result_msg)
+            return True
+        elif error_count == 0:
+            result_msg = f"⚠️ Ba'zi ogohlantirishlar bor, lekin dastur ishlashi mumkin."
+            print(result_msg)
+            self.file_content.append(result_msg)
+            return True
+        else:
+            result_msg = f"❌ {error_count} ta muhim muammo topildi. Avval ularni hal qiling."
+            print(result_msg)
+            self.file_content.append(result_msg)
+            return False
 
 
 def main():

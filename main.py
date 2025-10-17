@@ -25,13 +25,13 @@ def safe_input(prompt: str, default: str = "") -> str:
 async def main():
     logger.info("🚀 Files Project Scraper")
     logger.info("=" * 50)
-    
+
     # 1️⃣ Avval config tanlaymiz
     logger.info("📋 Mavjud configlar:")
     configs_list = list(SITE_CONFIGS.keys())
     for i, name in enumerate(configs_list, start=1):
         logger.info(f"[{i}] {name}")
-    
+
     # Special options without config
     logger.info("\n🔧 Sistema rejimlar:")
     logger.info("[info] System Diagnostics")
@@ -44,20 +44,25 @@ async def main():
     if choice.lower() == "info":
         logger.info("🔍 System Diagnostics ishga tushmoqda...")
         diagnostics = SystemDiagnostics()
-        success = diagnostics.run_full_diagnostics()
         
+        # Verbose mode uchun so'rash
+        verbose_choice = safe_input("Batafsil ko'rsatish? (y/n): ", "n").lower()
+        verbose = verbose_choice in ['y', 'yes', 'ha']
+        
+        success = diagnostics.run_full_diagnostics(verbose=verbose)
+
         if success:
-            logger.info("\n✅ Tizim tayyor!")
+            logger.info("✅ Tizim tayyor!")
         else:
-            logger.warning("\n⚠️ Ba'zi muammolar topildi. fix_system.sh faylini ishga tushiring.")
-        
+            logger.warning("⚠️ Ba'zi muammolar topildi. system_diagnostics_report.txt faylini ko'ring.")
+
         logger.info("🎉 System Diagnostics yakunlandi!")
         return
-    
+
     elif choice.lower() == "clear-cache":
         await clear_downloads_cache()
         return
-    
+
     elif choice.lower() == "clear-db":
         await clear_database_file()
         return
@@ -73,7 +78,7 @@ async def main():
 
     # Umumiy APP_CONFIG bilan birlashtiramiz
     CONFIG = {**APP_CONFIG, **SITE_CONFIG}
-    
+
     # 2️⃣ Config tanlangandan keyin rejimlarni ko'rsatamiz
     await show_config_menu(CONFIG, site_name)
 
@@ -90,7 +95,7 @@ async def clear_downloads_cache():
             logger.error(f"❌ Downloads tozalashda xato: {e}")
     else:
         logger.info("📂 Downloads papkasi mavjud emas")
-    
+
     logger.info("🎉 Cache tozalash yakunlandi!")
 
 
@@ -104,7 +109,7 @@ async def clear_database_file():
             logger.info("📂 Database fayli mavjud emas")
     except Exception as e:
         logger.error(f"❌ Database tozalashda xato: {e}")
-    
+
     logger.info("🎉 Database tozalash yakunlandi!")
 
 
@@ -114,21 +119,30 @@ async def show_files_stats(site_name: str):
     try:
         # Jami fayllar soni
         total_files = db.get_files_count(site_name)
-        
+
         # Yuklangan fayllar (local_path mavjud)
         downloaded_files = db.get_downloaded_files_count(site_name)
-        
+
+        # Telegramga yuklangan fayllar
+        uploaded_files = db.get_uploaded_files_count(site_name)
+
         # Yuklanmagan fayllar
         not_downloaded = total_files - downloaded_files
-        
+        not_uploaded = max(0, downloaded_files - uploaded_files)  # Manfiy bo'lmaslik uchun
+
         logger.info("📊 FAYLLAR STATISTIKASI")
-        logger.info("=" * 40) 
+        logger.info("=" * 40)
         logger.info(f"📁 Site: {site_name}")
         logger.info(f"📋 Jami fayllar: {total_files}")
-        logger.info(f"✅ Yuklangan: {downloaded_files}")
+        logger.info(f"⬇️ Yuklangan: {downloaded_files}")
+        logger.info(f"⬆️ Telegramga yuklangan: {uploaded_files}")
         logger.info(f"⏳ Yuklanmagan: {not_downloaded}")
-        logger.info(f"📈 Yuklanish foizi: {(downloaded_files/total_files*100) if total_files > 0 else 0:.1f}%")
-        
+        logger.info(f"📤 Upload qilinmagan: {not_uploaded}")
+        logger.info(
+            f"📈 Yuklanish foizi: {(downloaded_files/total_files*100) if total_files > 0 else 0:.1f}%")
+        logger.info(
+            f"📊 Upload foizi: {(uploaded_files/downloaded_files*100) if downloaded_files > 0 else 0:.1f}%")
+
     except Exception as e:
         logger.error(f"❌ Statistika olishda xato: {e}")
 
@@ -137,15 +151,16 @@ async def show_config_menu(CONFIG, site_name):
     """Config ichidagi rejimlarni ko'rsatish"""
     logger.info(f"\n🎯 Tanlangan Config: {site_name}")
     logger.info("=" * 50)
-    
+
     # Fayllar statistikasini ko'rsatish
     await show_files_stats(site_name)
-    
-    logger.info("\n� Mavjud rejimlar:")
+
+    logger.info("\n🎮 Mavjud rejimlar:")
     logger.info("[1] Scrape - yangi fayllarni topish")
     logger.info("[2] Download - fayllarni yuklash")
     logger.info("[3] Download + Upload - yuklash va Telegramga yuborish")
     logger.info("[stats] Fayllar statistikasi")
+    logger.info("[reset] Upload statusini reset qilish")
     logger.info("[clear] Bu config'dagi barcha fayllarni o'chirish")
     logger.info("[back] Bosh menyuga qaytish")
 
@@ -159,6 +174,8 @@ async def show_config_menu(CONFIG, site_name):
         await download_and_upload(CONFIG)
     elif mode.lower() == "stats":
         await show_files_stats(site_name)
+    elif mode.lower() == "reset":
+        await reset_uploaded_status(site_name)
     elif mode.lower() == "clear":
         await clear_config_files(site_name)
     elif mode.lower() == "back":
@@ -173,9 +190,9 @@ async def handle_scraping(CONFIG, site_name):
     logger.info("\n🔍 Scraping rejimini tanlang:")
     logger.info("[1] Oddiy scraping")
     logger.info("[2] Quick scraping")
-    
+
     scrape_mode = safe_input("Scraping turi → ")
-    
+
     if scrape_mode == "1":
         logger.info("🚀 Scraping boshlandi...")
         result = await scrape(CONFIG, BROWSER_CONFIG)
@@ -203,26 +220,53 @@ async def show_scraping_results(result):
             # Performance statistika
             stats = result.get('stats', {})
             if stats:
-                logger.info(f"   ⏱️ Vaqt: {stats.get('duration_seconds', 0):.2f}s")
-                logger.info(f"   🏃 Tezlik: {stats.get('items_per_second', 0):.2f} item/s")
-                logger.info(f"   📊 Muvaffaqiyat: {stats.get('success_rate', 0):.1f}%")
+                logger.info(
+                    f"   ⏱️ Vaqt: {stats.get('duration_seconds', 0):.2f}s")
+                logger.info(
+                    f"   🏃 Tezlik: {stats.get('items_per_second', 0):.2f} item/s")
+                logger.info(
+                    f"   📊 Muvaffaqiyat: {stats.get('success_rate', 0):.1f}%")
         elif result.get('status') == 'cancelled':
             logger.info("   🚫 Foydalanuvchi tomonidan bekor qilindi")
         elif result.get('status') == 'failed':
-            logger.warning(f"   ⚠️ Muvaffaqiyatsiz: {result.get('reason', 'Unknown')}")
+            logger.warning(
+                f"   ⚠️ Muvaffaqiyatsiz: {result.get('reason', 'Unknown')}")
         else:
             logger.error(f"   ❌ Xato: {result.get('error', 'Unknown error')}")
 
 
+async def reset_uploaded_status(site_name):
+    """Bitta config'ga tegishli barcha fayllarning uploaded statusini reset qilish"""
+    confirm = safe_input(
+        f"⚠️ {site_name} dagi barcha fayllarning upload statusini reset qilishni tasdiqlaysizmi? (yes/no): ", "no").lower()
+
+    if confirm in ['yes', 'y', 'ha']:
+        try:
+            db = FileDB()
+            reset_count = db.reset_uploaded_status(site_name)
+            logger.info(
+                f"✅ {site_name} da {reset_count} ta faylning upload statusi reset qilindi")
+            logger.info("📤 Endi bu fayllar qayta upload qilinishi mumkin")
+            
+            # Yangi statistikani ko'rsatish
+            await show_files_stats(site_name)
+        except Exception as e:
+            logger.error(f"❌ Upload status reset qilishda xato: {e}")
+    else:
+        logger.info("❌ Bekor qilindi")
+
+
 async def clear_config_files(site_name):
     """Bitta config'ga tegishli barcha fayllarni o'chirish"""
-    confirm = safe_input(f"⚠️ {site_name} dagi barcha fayllarni o'chirishni tasdiqlaysizmi? (yes/no): ", "no").lower()
-    
+    confirm = safe_input(
+        f"⚠️ {site_name} dagi barcha fayllarni o'chirishni tasdiqlaysizmi? (yes/no): ", "no").lower()
+
     if confirm in ['yes', 'y', 'ha']:
         try:
             db = FileDB()
             deleted_count = db.delete_files(site_name)
-            logger.info(f"✅ {site_name} dan {deleted_count} ta fayl o'chirildi")
+            logger.info(
+                f"✅ {site_name} dan {deleted_count} ta fayl o'chirildi")
         except Exception as e:
             logger.error(f"❌ Fayllarni o'chirishda xato: {e}")
     else:
