@@ -48,9 +48,9 @@ class FileDownloader:
                         total = int(resp.headers.get("Content-Length", 0))
 
                         # Real download boshlanganda log
-                        size_gb = total / (1024 ** 3) if total else 0
-                        logger.info(
-                            f"🚀 Download boshlandi: {filename} ({size_gb:.2f} GB)")
+                        # size_gb = total / (1024 ** 3) if total else 0
+                        # logger.info(
+                        #     f"🚀 Download boshlandi: {filename} ({size_gb:.2f} GB)")
 
                         with open(output_path, "wb") as f, tqdm(
                             total=total, unit="B", unit_scale=True, desc=f"⬇️ {filename}"
