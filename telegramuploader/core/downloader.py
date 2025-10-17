@@ -14,12 +14,40 @@ from utils.logger_core import logger
 class FileDownloader:
     """Fayllarni yuklab olish uchun class"""
 
-    def __init__(self, timeout: int = 7200):
+    def __init__(self, base_timeout: int = 7200, max_retries: int = 3):
         """
         Args:
-            timeout: Download timeout in seconds (default: 2 hours)
+            base_timeout: Base timeout in seconds (default: 2 hours)
+            max_retries: Maximum retry attempts (default: 3)
         """
-        self.timeout = timeout
+        self.base_timeout = base_timeout
+        self.max_retries = max_retries
+
+    def calculate_timeout(self, file_size: int) -> int:
+        """
+        Fayl hajmiga qarab intelligent timeout hisoblash
+        
+        Args:
+            file_size: File size in bytes
+            
+        Returns:
+            Timeout in seconds
+        """
+        if file_size <= 0:
+            return self.base_timeout
+        
+        # Minimum 10 minutes, maximum 4 hours (telegram upload uchun uzunroq)
+        min_timeout = 600   # 10 minutes
+        max_timeout = 14400  # 4 hours
+        
+        # Assume 50KB/s minimum speed for telegram, add 50% buffer
+        calculated_timeout = int((file_size / (50 * 1024)) * 1.5)
+        
+        # Apply bounds
+        timeout = max(min_timeout, min(calculated_timeout, max_timeout))
+        
+        logger.info(f"🕐 Telegram timeout: {timeout}s ({timeout/60:.1f}min) for {file_size/1024/1024:.1f}MB")
+        return timeout
 
     async def download(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore,
                        file_url: str, output_path: str, filename: str) -> Optional[int]:
@@ -38,14 +66,21 @@ class FileDownloader:
         """
         async with semaphore:
             try:
-                # ⏰ Timeout qo'shamiz
-                async with asyncio.timeout(self.timeout):
+                # Avval file size olish
+                async with session.head(file_url) as head_resp:
+                    file_size = int(head_resp.headers.get("Content-Length", 0))
+                
+                # Intelligent timeout hisoblash
+                timeout_seconds = self.calculate_timeout(file_size)
+                
+                # ⏰ Intelligent timeout qo'shamiz
+                async with asyncio.timeout(timeout_seconds):
                     async with session.get(file_url) as resp:
                         if resp.status != 200:
                             logger.error(f"❌ Yuklab bo'lmadi: {file_url}")
                             return None
 
-                        total = int(resp.headers.get("Content-Length", 0))
+                        total = int(resp.headers.get("Content-Length", file_size or 0))
 
                         # Real download boshlanganda log
                         # size_gb = total / (1024 ** 3) if total else 0
@@ -71,7 +106,7 @@ class FileDownloader:
 
             except asyncio.TimeoutError:
                 logger.error(
-                    f"⏰ Timeout: {filename} yuklab olish {self.timeout//60} daqiqadan oshdi")
+                    f"⏰ Timeout: {filename} yuklab olish {timeout_seconds//60} daqiqadan oshdi")
                 if os.path.exists(output_path):
                     os.remove(output_path)
                 return None

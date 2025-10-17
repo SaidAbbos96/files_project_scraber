@@ -69,10 +69,14 @@ class FileDownloader:
                     
                     # Intelligent timeout calculation
                     timeout_seconds = self.calculate_timeout(file_size)
+                    
+                    # sock_read timeout ham intelligent bo'lishi kerak
+                    sock_read_timeout = min(timeout_seconds // 4, 1800)  # 1/4 yoki max 30 min
+                    
                     timeout = aiohttp.ClientTimeout(
                         total=timeout_seconds,
                         connect=60,  # Connection timeout 1 minute
-                        sock_read=300  # Socket read timeout 5 minutes
+                        sock_read=sock_read_timeout  # Dynamic socket read timeout
                     )
                     
                     size_mb = file_size / (1024 * 1024) if file_size else 0
@@ -80,7 +84,8 @@ class FileDownloader:
                     if attempt > 0:
                         logger.info(f"🔄 Retry {attempt + 1}/{self.max_retries}: {filename}")
                     
-                    logger.info(f"⬇️ Downloading: {filename} ({size_mb:.2f} MB) - Timeout: {timeout_seconds}s")
+                    logger.info(f"⬇️ Downloading: {filename} ({size_mb:.2f} MB)")
+                    logger.info(f"⏱️ Timeouts: Total={timeout_seconds}s, SockRead={sock_read_timeout}s")
                     
                     async with session.get(file_url, timeout=timeout) as resp:
                         if resp.status != 200:
