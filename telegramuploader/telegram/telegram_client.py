@@ -6,7 +6,7 @@ from datetime import datetime
 from core import config
 
 
-phone = config.TELEGRAM_PHONE
+phone = config.TELEGRAM_PHONE_NUMBER
 api_id = config.TELEGRAM_API_ID
 api_hash = config.TELEGRAM_API_HASH
 files_group_link = config.FILES_GROUP_LINK

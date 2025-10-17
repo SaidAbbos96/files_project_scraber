@@ -39,16 +39,61 @@ class TelegramUploader:
         """Video fayl uchun attributes olish"""
         try:
             import ffmpeg
-            
+            import subprocess
+
+            # ffprobe path'ini topish - avval system, keyin imageio-ffmpeg
+            ffprobe_path = None
+
+            # 1. Avval system ffprobe'ni tekshiramiz (ko'pincha mavjud va tez)
+            for path in ['/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'ffprobe']:
+                try:
+                    subprocess.run([path, '-version'], capture_output=True, check=True, timeout=5)
+                    ffprobe_path = path
+                    logger.info(f"🔍 System ffprobe: {ffprobe_path}")
+                    break
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    continue
+
+            # 2. Agar system ffprobe yo'q bo'lsa, imageio-ffmpeg'dan foydalanish
+            if not ffprobe_path:
+                try:
+                    import imageio_ffmpeg
+                    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+                    if ffmpeg_path and os.path.exists(ffmpeg_path):
+                        # ffmpeg binary'dan ffprobe path yasash
+                        potential_ffprobe = ffmpeg_path.replace('ffmpeg', 'ffprobe')
+                        
+                        # Agar ffprobe fayl mavjud bo'lsa
+                        if os.path.exists(potential_ffprobe):
+                            ffprobe_path = potential_ffprobe
+                            logger.info(f"🔍 imageio-ffmpeg ffprobe: {ffprobe_path}")
+                        else:
+                            # ffmpeg'ni ffprobe sifatida ishlatish (ffmpeg -i ... bilan ham ma'lumot olish mumkin)
+                            logger.warning(f"⚠️ ffprobe topilmadi: {potential_ffprobe}")
+                            logger.info("🔄 ffmpeg'ni probe uchun ishlatamiz")
+                            ffprobe_path = ffmpeg_path
+                except ImportError:
+                    logger.warning("⚠️ imageio-ffmpeg topilmadi")
+                except Exception as e:
+                    logger.warning(f"⚠️ imageio-ffmpeg xato: {e}")
+
+            if not ffprobe_path:
+                logger.warning(
+                    "⚠️ ffprobe topilmadi, default attributes ishlatiladi")
+                return self._get_default_video_attributes()
+
             # Video info olish
-            probe = ffmpeg.probe(file_path)
-            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-            
+            probe = ffmpeg.probe(file_path, cmd=ffprobe_path)
+            video_stream = next(
+                (stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+
             if video_stream:
-                width = int(video_stream.get('width', 0))
-                height = int(video_stream.get('height', 0))
+                width = int(video_stream.get('width', 1280))
+                height = int(video_stream.get('height', 720))
                 duration = float(probe.get('format', {}).get('duration', 0))
-                
+
+                logger.info(f"📹 Video info: {width}x{height}, {duration:.1f}s")
+
                 # Video attributes yaratish
                 return DocumentAttributeVideo(
                     duration=int(duration),
@@ -57,22 +102,28 @@ class TelegramUploader:
                     supports_streaming=True,
                     round_message=False
                 )
+            else:
+                logger.warning("⚠️ Video stream topilmadi")
+                return self._get_default_video_attributes()
+
         except Exception as e:
             logger.warning(f"⚠️ Video attributes olishda xato: {e}")
-            # Default video attributes
-            return DocumentAttributeVideo(
-                duration=0,
-                w=1280,
-                h=720,
-                supports_streaming=True,
-                round_message=False
-            )
-        
-        return None
+            return self._get_default_video_attributes()
+
+    def _get_default_video_attributes(self) -> DocumentAttributeVideo:
+        """Default video attributes qaytarish"""
+        return DocumentAttributeVideo(
+            duration=0,
+            w=1280,
+            h=720,
+            supports_streaming=True,
+            round_message=False
+        )
 
     def is_video_file(self, filename: str) -> bool:
         """Fayl video ekanligini tekshirish"""
-        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        video_extensions = {'.mp4', '.avi', '.mkv',
+                            '.mov', '.wmv', '.flv', '.webm', '.m4v'}
         return Path(filename).suffix.lower() in video_extensions
 
     async def upload_file(self, item: Dict[str, Any], config: Dict[str, Any],
@@ -150,7 +201,8 @@ class TelegramUploader:
                         video_attr = self.get_video_attributes(output_path)
                         if video_attr:
                             attributes = [video_attr]
-                            logger.info(f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
+                            logger.info(
+                                f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
 
                     await Telegram_client.send_file(
                         entity,

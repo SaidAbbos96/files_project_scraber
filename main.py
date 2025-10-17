@@ -7,10 +7,42 @@ from scraper import scrape, ScrapingOrchestrator, quick_scrape
 from core.config import APP_CONFIG, BROWSER_CONFIG
 from core.site_configs import SITE_CONFIGS
 from telegramuploader.legacy_adapter import download_and_upload
+from utils.system_diagnostics import SystemDiagnostics
 
 
 async def main():
-    logger.info("Mavjud configlar:")
+    # 1️⃣ Avval rejimni tanlaymiz
+    logger.info("🚀 Files Project Scraper")
+    logger.info("=" * 50)
+    logger.info("Rejimni tanlang:")
+    logger.info("[0] Files list ni ko'rsatish")
+    logger.info("[1] Scrape (asosiy)")
+    logger.info("[1a] Quick Scrape (avtomatik)")
+    logger.info("[2] Download (faqat yuklash)")
+    logger.info("[3] Download + Upload (Telegramga yuborish)")
+    logger.info("[info/test] System Diagnostics (tizimni tekshirish)")
+    logger.info("[x] Delete files from DB")
+
+    mode = input("Rejimni tanlang → ").strip()
+
+    # 🔍 System Diagnostics - configsiz ishlaydi
+    if mode.lower() in ["info", "test", "diagnostics"]:
+        logger.info("🔍 System Diagnostics ishga tushmoqda...")
+        diagnostics = SystemDiagnostics()
+        success = diagnostics.run_full_diagnostics()
+
+        if success:
+            logger.info("\n✅ Tizim tayyor!")
+        else:
+            logger.warning(
+                "\n⚠️ Ba'zi muammolar topildi. fix_system.sh faylini ishga tushiring.")
+
+        # Dasturni yakunlaymiz
+        logger.info("🎉 System Diagnostics yakunlandi!")
+        return
+
+    # 2️⃣ Keyin config tanlaymize (faqat zarur bo'lsa)
+    logger.info("\n📋 Mavjud configlar:")
     configs_list = list(SITE_CONFIGS.keys())
     for i, name in enumerate(configs_list, start=1):
         logger.info(f"[{i}] {name}")
@@ -18,7 +50,7 @@ async def main():
     choice = input("Qaysi configni ishlatamiz? raqamini kiriting → ").strip()
 
     if not choice.isdigit() or not (1 <= int(choice) <= len(configs_list)):
-        logger.info("❌ Noto‘g‘ri tanlov!")
+        logger.info("❌ Noto'g'ri tanlov!")
         return
 
     site_name = configs_list[int(choice) - 1]
@@ -27,15 +59,10 @@ async def main():
 
     # Umumiy APP_CONFIG bilan birlashtiramiz
     CONFIG = {**APP_CONFIG, **SITE_CONFIG}
-    logger.info("Rejimni tanlang:")
-    logger.info("[0] Files list ni ko'rsatish (test)")
-    logger.info("[1] Scrape (asosiy)")
-    logger.info("[1a] Quick Scrape (avtomatik, input so'ramasdan)")
-    # logger.info("[1b] Advanced Scrape (to'liq statistika bilan)")
-    logger.info("[2] Download (faqat yuklash)")
-    logger.info("[3] Download + Upload (Telegramga yuborish)")
 
-    mode = CONFIG.get("work_mode") or input("→ ").strip()
+    # 3️⃣ Tanlangan rejimni bajaramiz
+    logger.info(f"\n🎯 Rejim: {mode} | Config: {site_name}")
+    logger.info("=" * 50)
 
     if mode == "1":
         # Asosiy scraping
@@ -108,7 +135,7 @@ async def main():
         db.delete_files(site_name)
         logger.info(f"❌ Files in {site_name} deleted from DB.")
     else:
-        logger.info("❌ Noto‘g‘ri tanlov!")
+        logger.info("❌ Noto'g'ri tanlov!")
         exit(1)
 
 
