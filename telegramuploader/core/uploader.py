@@ -12,6 +12,7 @@ import asyncio
 from pathlib import Path
 from tqdm.asyncio import tqdm
 from typing import Dict, Any, Optional
+from telethon.tl.types import DocumentAttributeVideo
 
 import sys
 import os
@@ -33,6 +34,46 @@ class TelegramUploader:
         """
         self.default_group = default_group
         self.timeout = timeout
+
+    def get_video_attributes(self, file_path: str) -> Optional[DocumentAttributeVideo]:
+        """Video fayl uchun attributes olish"""
+        try:
+            import ffmpeg
+            
+            # Video info olish
+            probe = ffmpeg.probe(file_path)
+            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+            
+            if video_stream:
+                width = int(video_stream.get('width', 0))
+                height = int(video_stream.get('height', 0))
+                duration = float(probe.get('format', {}).get('duration', 0))
+                
+                # Video attributes yaratish
+                return DocumentAttributeVideo(
+                    duration=int(duration),
+                    w=width,
+                    h=height,
+                    supports_streaming=True,
+                    round_message=False
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Video attributes olishda xato: {e}")
+            # Default video attributes
+            return DocumentAttributeVideo(
+                duration=0,
+                w=1280,
+                h=720,
+                supports_streaming=True,
+                round_message=False
+            )
+        
+        return None
+
+    def is_video_file(self, filename: str) -> bool:
+        """Fayl video ekanligini tekshirish"""
+        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        return Path(filename).suffix.lower() in video_extensions
 
     async def upload_file(self, item: Dict[str, Any], config: Dict[str, Any],
                           group_ref: Optional[str] = None) -> bool:
@@ -103,6 +144,14 @@ class TelegramUploader:
                         bar.total = total_size
                         bar.refresh()
 
+                    # Video fayl uchun attributes tayyorlash
+                    attributes = None
+                    if self.is_video_file(filename):
+                        video_attr = self.get_video_attributes(output_path)
+                        if video_attr:
+                            attributes = [video_attr]
+                            logger.info(f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
+
                     await Telegram_client.send_file(
                         entity,
                         output_path,
@@ -110,6 +159,8 @@ class TelegramUploader:
                         parse_mode="html",
                         supports_streaming=True,  # 🔑 video sifatida yuboriladi
                         progress_callback=progress,
+                        attributes=attributes,  # 🎬 Video attributes qo'shish
+                        force_document=False,   # Video'ni video sifatida yuborish
                     )
 
             duration = time.time() - start_time
