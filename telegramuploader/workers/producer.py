@@ -192,7 +192,7 @@ class FileProducer:
                         )
                     return 0
 
-        logger.info(f"📥 [{file_info['id']}] Download boshlandi: {filename}")
+        # logger.info(f"📥 [{file_info['id']}] Download boshlandi: {filename}")
 
         # Notification yuborish
         if not self._quiet_mode:
