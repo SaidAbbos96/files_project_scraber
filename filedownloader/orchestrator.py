@@ -30,10 +30,11 @@ class FileDownloaderOrchestrator:
         if not is_valid:
             raise ValueError(f"Invalid configuration: {reason}")
         
-        # Initialize components
+        # Initialize components with enhanced timeout and retry
         self.downloader = FileDownloader(
-            timeout=config.get("download_timeout", 600),  # 10 minutes
-            chunk_size=config.get("download_chunk_size", 256 * 1024)  # 256KB
+            base_timeout=config.get("download_base_timeout", 1800),  # 30 minutes base
+            chunk_size=config.get("download_chunk_size", 256 * 1024),  # 256KB
+            max_retries=config.get("download_max_retries", 3)  # 3 retries
         )
         
         self.db = FileDownloaderDB()

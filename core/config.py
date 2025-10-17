@@ -26,6 +26,9 @@ APP_CONFIG = {
     "concurrency": int(os.getenv("DOWNLOAD_CONCURRENCY", "2")),  # Backward compatibility
     "scrape_concurrency": int(os.getenv("SCRAPE_CONCURRENCY", "5")),
     "download_concurrency": int(os.getenv("DOWNLOAD_CONCURRENCY", "2")),
+    "download_base_timeout": int(os.getenv("DOWNLOAD_BASE_TIMEOUT", "1800")),
+    "download_max_retries": int(os.getenv("DOWNLOAD_MAX_RETRIES", "3")),
+    "download_chunk_size": int(os.getenv("DOWNLOAD_CHUNK_SIZE", "262144")),
     "upload_concurrency": int(os.getenv("UPLOAD_CONCURRENCY", "2")),
     "upload_workers": int(os.getenv("UPLOAD_WORKERS", "2")),
 

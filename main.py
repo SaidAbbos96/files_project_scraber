@@ -44,17 +44,19 @@ async def main():
     if choice.lower() == "info":
         logger.info("🔍 System Diagnostics ishga tushmoqda...")
         diagnostics = SystemDiagnostics()
-        
+
         # Verbose mode uchun so'rash
-        verbose_choice = safe_input("Batafsil ko'rsatish? (y/n): ", "n").lower()
+        verbose_choice = safe_input(
+            "Batafsil ko'rsatish? (y/n): ", "n").lower()
         verbose = verbose_choice in ['y', 'yes', 'ha']
-        
+
         success = diagnostics.run_full_diagnostics(verbose=verbose)
 
         if success:
             logger.info("✅ Tizim tayyor!")
         else:
-            logger.warning("⚠️ Ba'zi muammolar topildi. system_diagnostics_report.txt faylini ko'ring.")
+            logger.warning(
+                "⚠️ Ba'zi muammolar topildi. system_diagnostics_report.txt faylini ko'ring.")
 
         logger.info("🎉 System Diagnostics yakunlandi!")
         return
@@ -128,7 +130,8 @@ async def show_files_stats(site_name: str):
 
         # Yuklanmagan fayllar
         not_downloaded = total_files - downloaded_files
-        not_uploaded = max(0, downloaded_files - uploaded_files)  # Manfiy bo'lmaslik uchun
+        # Manfiy bo'lmaslik uchun
+        not_uploaded = max(0, downloaded_files - uploaded_files)
 
         logger.info("📊 FAYLLAR STATISTIKASI")
         logger.info("=" * 40)
@@ -247,7 +250,7 @@ async def reset_uploaded_status(site_name):
             logger.info(
                 f"✅ {site_name} da {reset_count} ta faylning upload statusi reset qilindi")
             logger.info("📤 Endi bu fayllar qayta upload qilinishi mumkin")
-            
+
             # Yangi statistikani ko'rsatish
             await show_files_stats(site_name)
         except Exception as e:

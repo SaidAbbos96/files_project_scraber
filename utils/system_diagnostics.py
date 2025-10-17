@@ -12,19 +12,22 @@ from typing import Dict, List, Tuple, Optional
 import importlib.util
 from utils.logger_core import logger
 
+logs_dir = "logs"
+os.makedirs(logs_dir, exist_ok=True)
+
 
 class SystemDiagnostics:
     """Tizim diagnostikasi class"""
-    
+
     def __init__(self):
         self.results = []
         self.requirements = []
         self.python_packages = []
         self.system_packages = []
         self.config_issues = []
-        self.output_file = "system_diagnostics_report.txt"
+        self.output_file = "logs/system_diagnostics_report.txt"
         self.file_content = []  # Fayl uchun content
-        
+
     def log_result(self, category: str, name: str, status: str, message: str, fix_command: str = None, quiet=False):
         """Tekshiruv natijasini yozish"""
         result = {
@@ -35,68 +38,70 @@ class SystemDiagnostics:
             'fix_command': fix_command
         }
         self.results.append(result)
-        
+
         status_emoji = {
             'OK': '✅',
             'WARN': '⚠️',
             'ERROR': '❌',
             'INFO': '📋'
         }
-        
+
         emoji = status_emoji.get(status, '❓')
         log_line = f"{emoji} {category} - {name}: {message}"
-        
+
         # Faylga ham yozish
         self.file_content.append(log_line)
         if fix_command and status in ['ERROR', 'WARN']:
             fix_line = f"   💡 Fix: {fix_command}"
             self.file_content.append(fix_line)
-        
+
         # Console'ga faqat quiet bo'lmasa yozish
         if not quiet:
             print(log_line)
             if fix_command and status in ['ERROR', 'WARN']:
                 print(fix_line)
-            
+
     def check_python_environment(self):
         """Python muhitini tekshirish"""
         print("\n🐍 PYTHON ENVIRONMENT CHECK")
         print("=" * 50)
-        
+
         # Python version
         python_version = platform.python_version()
         major, minor = map(int, python_version.split('.')[:2])
         if major > 3 or (major == 3 and minor >= 8):
-            self.log_result("Python", "Version", "OK", f"Python {python_version}")
+            self.log_result("Python", "Version", "OK",
+                            f"Python {python_version}")
         else:
-            self.log_result("Python", "Version", "ERROR", 
-                          f"Python {python_version} - 3.8+ kerak",
-                          "Python 3.8+ o'rnating")
-        
+            self.log_result("Python", "Version", "ERROR",
+                            f"Python {python_version} - 3.8+ kerak",
+                            "Python 3.8+ o'rnating")
+
         # Virtual environment
         if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
             venv_path = sys.prefix
-            self.log_result("Python", "Virtual Environment", "OK", f"Active: {venv_path}")
+            self.log_result("Python", "Virtual Environment",
+                            "OK", f"Active: {venv_path}")
         else:
-            self.log_result("Python", "Virtual Environment", "WARN", 
-                          "Virtual environment ishlatilmayapti",
-                          "python -m venv venv && source venv/bin/activate")
-        
+            self.log_result("Python", "Virtual Environment", "WARN",
+                            "Virtual environment ishlatilmayapti",
+                            "python -m venv venv && source venv/bin/activate")
+
         # Pip version
         try:
-            result = subprocess.run([sys.executable, '-m', 'pip', '--version'], 
-                                  capture_output=True, text=True, check=True)
+            result = subprocess.run([sys.executable, '-m', 'pip', '--version'],
+                                    capture_output=True, text=True, check=True)
             pip_version = result.stdout.split()[1]
             self.log_result("Python", "Pip", "OK", f"Pip {pip_version}")
         except Exception as e:
-            self.log_result("Python", "Pip", "ERROR", f"Pip xato: {e}", 
-                          "python -m ensurepip --upgrade")
-    
+            self.log_result("Python", "Pip", "ERROR", f"Pip xato: {e}",
+                            "python -m ensurepip --upgrade")
+
     def check_required_python_packages(self):
         """Kerakli Python paketlarni tekshirish"""
         print("\n📦 PYTHON PACKAGES CHECK")
         print("=" * 50)
-        
+
         required_packages = {
             'aiohttp': '3.12.15',
             'playwright': '1.55.0',
@@ -108,165 +113,175 @@ class SystemDiagnostics:
             'UzTransliterator': '0.0.36',
             'python-dotenv': '1.1.1'
         }
-        
+
         for package, min_version in required_packages.items():
             try:
                 # Package import test
                 if package == 'beautifulsoup4':
                     import bs4
-                    version = bs4.__version__ if hasattr(bs4, '__version__') else 'unknown'
+                    version = bs4.__version__ if hasattr(
+                        bs4, '__version__') else 'unknown'
                 elif package == 'python-dotenv':
                     import dotenv
-                    version = dotenv.__version__ if hasattr(dotenv, '__version__') else 'unknown'
+                    version = dotenv.__version__ if hasattr(
+                        dotenv, '__version__') else 'unknown'
                 elif package == 'ffmpeg-python':
                     import ffmpeg
                     version = 'installed'
                 elif package == 'imageio-ffmpeg':
                     import imageio_ffmpeg
-                    version = imageio_ffmpeg.__version__ if hasattr(imageio_ffmpeg, '__version__') else 'unknown'
+                    version = imageio_ffmpeg.__version__ if hasattr(
+                        imageio_ffmpeg, '__version__') else 'unknown'
                 else:
                     module = importlib.import_module(package.replace('-', '_'))
                     version = getattr(module, '__version__', 'unknown')
-                
-                self.log_result("Package", package, "OK", f"Installed: {version}")
-                
+
+                self.log_result("Package", package, "OK",
+                                f"Installed: {version}")
+
             except ImportError:
-                self.log_result("Package", package, "ERROR", 
-                              f"Package topilmadi", 
-                              f"pip install {package}>={min_version}")
+                self.log_result("Package", package, "ERROR",
+                                f"Package topilmadi",
+                                f"pip install {package}>={min_version}")
                 self.python_packages.append(f"{package}>={min_version}")
-    
+
     def check_system_dependencies(self):
         """Tizim dependencylarini tekshirish"""
         print("\n🔧 SYSTEM DEPENDENCIES CHECK")
         print("=" * 50)
-        
+
         # FFmpeg binaries
         ffmpeg_binaries = ['ffmpeg', 'ffprobe']
         for binary in ffmpeg_binaries:
             path = shutil.which(binary)
             if path:
                 try:
-                    result = subprocess.run([binary, '-version'], 
-                                          capture_output=True, text=True, check=True, timeout=5)
+                    result = subprocess.run([binary, '-version'],
+                                            capture_output=True, text=True, check=True, timeout=5)
                     version_line = result.stdout.split('\n')[0]
-                    version = version_line.split('version')[1].split()[0] if 'version' in version_line else 'unknown'
-                    self.log_result("System", binary, "OK", f"Found: {path} (v{version})")
+                    version = version_line.split('version')[1].split(
+                    )[0] if 'version' in version_line else 'unknown'
+                    self.log_result("System", binary, "OK",
+                                    f"Found: {path} (v{version})")
                 except Exception as e:
-                    self.log_result("System", binary, "WARN", f"Path found but error: {e}")
+                    self.log_result("System", binary, "WARN",
+                                    f"Path found but error: {e}")
             else:
-                self.log_result("System", binary, "ERROR", 
-                              f"{binary} topilmadi",
-                              f"sudo apt install ffmpeg  # Ubuntu/Debian\nbrew install ffmpeg  # macOS")
+                self.log_result("System", binary, "ERROR",
+                                f"{binary} topilmadi",
+                                f"sudo apt install ffmpeg  # Ubuntu/Debian\nbrew install ffmpeg  # macOS")
                 self.system_packages.append('ffmpeg')
-        
+
         # Git
         git_path = shutil.which('git')
         if git_path:
             try:
-                result = subprocess.run(['git', '--version'], 
-                                      capture_output=True, text=True, check=True)
+                result = subprocess.run(['git', '--version'],
+                                        capture_output=True, text=True, check=True)
                 version = result.stdout.strip().split()[-1]
-                self.log_result("System", "git", "OK", f"Found: {git_path} (v{version})")
+                self.log_result("System", "git", "OK",
+                                f"Found: {git_path} (v{version})")
             except Exception as e:
                 self.log_result("System", "git", "WARN", f"Git error: {e}")
         else:
-            self.log_result("System", "git", "WARN", 
-                          "Git topilmadi",
-                          "sudo apt install git")
-        
+            self.log_result("System", "git", "WARN",
+                            "Git topilmadi",
+                            "sudo apt install git")
+
         # Curl
         curl_path = shutil.which('curl')
         if curl_path:
             self.log_result("System", "curl", "OK", f"Found: {curl_path}")
         else:
-            self.log_result("System", "curl", "WARN", 
-                          "Curl topilmadi", 
-                          "sudo apt install curl")
-    
+            self.log_result("System", "curl", "WARN",
+                            "Curl topilmadi",
+                            "sudo apt install curl")
+
     def check_video_attributes(self):
         """Video attributes functionality test"""
         print("\n🎬 VIDEO ATTRIBUTES TEST")
         print("=" * 50)
-        
+
         try:
             # Video attributes test
             from telegramuploader.core.uploader import TelegramUploader
             import tempfile
             import subprocess
-            
+
             uploader = TelegramUploader()
-            
+
             # Test video yaratish
             with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
                 test_file = tmp.name
-            
+
             try:
                 # 2 sekund test video
                 result = subprocess.run([
-                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=2:size=320x240:rate=10', 
+                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=2:size=320x240:rate=10',
                     '-c:v', 'libx264', '-preset', 'ultrafast', '-t', '2', '-y', test_file
                 ], capture_output=True, timeout=20, check=True)
-                
+
                 # Video attributes olish
                 attrs = uploader.get_video_attributes(test_file)
-                
+
                 if attrs and attrs.w > 0 and attrs.h > 0 and attrs.duration > 0:
-                    self.log_result("Video", "Attributes", "OK", 
-                                  f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s")
+                    self.log_result("Video", "Attributes", "OK",
+                                    f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s")
                 else:
-                    self.log_result("Video", "Attributes", "ERROR", 
-                                  "Video attributes failed",
-                                  "sudo apt install ffmpeg")
-                
+                    self.log_result("Video", "Attributes", "ERROR",
+                                    "Video attributes failed",
+                                    "sudo apt install ffmpeg")
+
             except subprocess.CalledProcessError as e:
-                self.log_result("Video", "Attributes", "ERROR", 
-                              "FFmpeg video test failed",
-                              "sudo apt install ffmpeg")
+                self.log_result("Video", "Attributes", "ERROR",
+                                "FFmpeg video test failed",
+                                "sudo apt install ffmpeg")
             except subprocess.TimeoutExpired:
-                self.log_result("Video", "Attributes", "ERROR", 
-                              "Video test timeout",
-                              "sudo apt install ffmpeg")
+                self.log_result("Video", "Attributes", "ERROR",
+                                "Video test timeout",
+                                "sudo apt install ffmpeg")
             finally:
                 # Cleanup
                 try:
                     os.remove(test_file)
                 except:
                     pass
-                    
+
         except ImportError as e:
-            self.log_result("Video", "Attributes", "ERROR", 
-                          f"Import error: {e}",
-                          "pip install ffmpeg-python")
+            self.log_result("Video", "Attributes", "ERROR",
+                            f"Import error: {e}",
+                            "pip install ffmpeg-python")
         except Exception as e:
-            self.log_result("Video", "Attributes", "ERROR", 
-                          f"Video test error: {e}")
-    
+            self.log_result("Video", "Attributes", "ERROR",
+                            f"Video test error: {e}")
+
     def check_playwright_browsers(self):
         """Playwright browserlarini tekshirish"""
         print("\n🌐 PLAYWRIGHT BROWSERS CHECK")
         print("=" * 50)
-        
+
         try:
             import playwright
-            self.log_result("Playwright", "Installation", "OK", "Playwright o'rnatilgan")
-            
+            self.log_result("Playwright", "Installation",
+                            "OK", "Playwright o'rnatilgan")
+
             # Browser binaries check - faqat path mavjudligini tekshiramiz
             import os
             from pathlib import Path
-            
+
             # Playwright browser cache directory
             playwright_cache = Path.home() / ".cache" / "ms-playwright"
-            
+
             browsers_found = 0
             browsers = ['chromium']
-            
+
             for browser in browsers:
                 browser_dirs = list(playwright_cache.glob(f"{browser}-*"))
                 if browser_dirs:
                     # Eng yangi versiyani topish
-                    latest_browser = max(browser_dirs, key=lambda x: x.stat().st_mtime)
-                    
+                    latest_browser = max(
+                        browser_dirs, key=lambda x: x.stat().st_mtime)
+
                     # Executable file mavjudligini tekshirish
                     if browser == 'chromium':
                         executable = latest_browser / "chrome-linux" / "chrome"
@@ -274,215 +289,228 @@ class SystemDiagnostics:
                         executable = latest_browser / "firefox" / "firefox"
                     else:  # webkit
                         executable = latest_browser / "minibrowser-gtk" / "MiniBrowser"
-                    
+
                     if executable.exists():
-                        self.log_result("Playwright", f"{browser.title()}", "OK", 
-                                      f"Browser mavjud: {latest_browser}")
+                        self.log_result("Playwright", f"{browser.title()}", "OK",
+                                        f"Browser mavjud: {latest_browser}")
                         browsers_found += 1
                     else:
-                        self.log_result("Playwright", f"{browser.title()}", "WARN", 
-                                      f"Browser papka mavjud lekin executable yo'q")
+                        self.log_result("Playwright", f"{browser.title()}", "WARN",
+                                        f"Browser papka mavjud lekin executable yo'q")
                 else:
-                    self.log_result("Playwright", f"{browser.title()}", "ERROR", 
-                                  f"Browser topilmadi")
-            
+                    self.log_result("Playwright", f"{browser.title()}", "ERROR",
+                                    f"Browser topilmadi")
+
             if browsers_found == 0:
-                self.log_result("Playwright", "Browser Status", "ERROR", 
-                              "Chromium topilmadi - loyiha ishlamaydi",
-                              "playwright install chromium")
+                self.log_result("Playwright", "Browser Status", "ERROR",
+                                "Chromium topilmadi - loyiha ishlamaydi",
+                                "playwright install chromium")
             else:
-                self.log_result("Playwright", "Browser Status", "OK", 
-                              "Chromium tayyor - loyiha ishlashi mumkin")
-                
+                self.log_result("Playwright", "Browser Status", "OK",
+                                "Chromium tayyor - loyiha ishlashi mumkin")
+
         except ImportError:
-            self.log_result("Playwright", "Installation", "ERROR", 
-                          "Playwright o'rnatilmagan",
-                          "pip install playwright && playwright install")
-    
+            self.log_result("Playwright", "Installation", "ERROR",
+                            "Playwright o'rnatilmagan",
+                            "pip install playwright && playwright install")
+
     def check_project_structure(self):
         """Loyiha tuzilmasini tekshirish"""
         print("\n📁 PROJECT STRUCTURE CHECK")
         print("=" * 50)
-        
+
         required_dirs = [
-            'core', 'scraper', 'filedownloader', 'telegramuploader', 
+            'core', 'scraper', 'filedownloader', 'telegramuploader',
             'utils', 'logs', 'downloads', 'local_db', 'results'
         ]
-        
+
         required_files = [
             'main.py', 'requirements.txt', 'README.md',
             'core/config.py', 'core/FileDB.py',
             'utils/logger_core.py'
         ]
-        
+
         project_root = Path.cwd()
-        
+
         # Directories
         for dir_name in required_dirs:
             dir_path = project_root / dir_name
             if dir_path.exists() and dir_path.is_dir():
-                self.log_result("Structure", f"Dir: {dir_name}", "OK", f"Mavjud: {dir_path}")
+                self.log_result(
+                    "Structure", f"Dir: {dir_name}", "OK", f"Mavjud: {dir_path}")
             else:
-                self.log_result("Structure", f"Dir: {dir_name}", "ERROR", 
-                              f"Papka topilmadi: {dir_path}",
-                              f"mkdir -p {dir_path}")
-        
+                self.log_result("Structure", f"Dir: {dir_name}", "ERROR",
+                                f"Papka topilmadi: {dir_path}",
+                                f"mkdir -p {dir_path}")
+
         # Files
         for file_name in required_files:
             file_path = project_root / file_name
             if file_path.exists() and file_path.is_file():
                 size = file_path.stat().st_size
-                self.log_result("Structure", f"File: {file_name}", "OK", 
-                              f"Mavjud ({size} bytes)")
+                self.log_result("Structure", f"File: {file_name}", "OK",
+                                f"Mavjud ({size} bytes)")
             else:
-                self.log_result("Structure", f"File: {file_name}", "ERROR", 
-                              f"Fayl topilmadi: {file_path}")
-    
+                self.log_result("Structure", f"File: {file_name}", "ERROR",
+                                f"Fayl topilmadi: {file_path}")
+
     def check_configuration(self):
         """Konfiguratsiya fayllarini tekshirish"""
         print("\n⚙️ CONFIGURATION CHECK")
         print("=" * 50)
-        
+
         # .env file
         env_path = Path('.env')
         if env_path.exists():
             self.log_result("Config", ".env", "OK", "Environment file mavjud")
-            
+
             # .env content check
             try:
                 with open(env_path, 'r') as f:
                     env_content = f.read()
-                
+
                 required_env_vars = [
-                    'TELEGRAM_API_ID', 'TELEGRAM_API_HASH', 
+                    'TELEGRAM_API_ID', 'TELEGRAM_API_HASH',
                     'TELEGRAM_PHONE_NUMBER', 'FILES_GROUP_LINK'
                 ]
-                
+
                 for var in required_env_vars:
                     if var in env_content and f'{var}=' in env_content:
                         # Check if not empty
-                        lines = [line for line in env_content.split('\n') if line.startswith(f'{var}=')]
+                        lines = [line for line in env_content.split(
+                            '\n') if line.startswith(f'{var}=')]
                         if lines and '=' in lines[0]:
                             value = lines[0].split('=', 1)[1].strip()
                             if value and value != 'your_value' and value != '':
-                                self.log_result("Config", f"Env: {var}", "OK", "O'rnatilgan")
+                                self.log_result(
+                                    "Config", f"Env: {var}", "OK", "O'rnatilgan")
                             else:
-                                self.log_result("Config", f"Env: {var}", "WARN", "Bo'sh qiymat yoki default")
+                                self.log_result(
+                                    "Config", f"Env: {var}", "WARN", "Bo'sh qiymat yoki default")
                         else:
-                            self.log_result("Config", f"Env: {var}", "WARN", "Bo'sh qiymat")
+                            self.log_result(
+                                "Config", f"Env: {var}", "WARN", "Bo'sh qiymat")
                     else:
-                        self.log_result("Config", f"Env: {var}", "ERROR", 
-                                      f"Environment variable topilmadi",
-                                      f"echo '{var}=your_value' >> .env")
-                        
+                        self.log_result("Config", f"Env: {var}", "ERROR",
+                                        f"Environment variable topilmadi",
+                                        f"echo '{var}=your_value' >> .env")
+
             except Exception as e:
-                self.log_result("Config", ".env content", "ERROR", f"O'qishda xato: {e}")
+                self.log_result("Config", ".env content",
+                                "ERROR", f"O'qishda xato: {e}")
         else:
-            self.log_result("Config", ".env", "ERROR", 
-                          "Environment file topilmadi",
-                          "cp .env.example .env  # va kerakli qiymatlarni to'ldiring")
-        
+            self.log_result("Config", ".env", "ERROR",
+                            "Environment file topilmadi",
+                            "cp .env.example .env  # va kerakli qiymatlarni to'ldiring")
+
         # .env.example
         env_example_path = Path('.env.example')
         if env_example_path.exists():
-            self.log_result("Config", ".env.example", "OK", "Example file mavjud")
+            self.log_result("Config", ".env.example",
+                            "OK", "Example file mavjud")
         else:
-            self.log_result("Config", ".env.example", "WARN", 
-                          "Example file topilmadi")
-    
+            self.log_result("Config", ".env.example", "WARN",
+                            "Example file topilmadi")
+
     def check_permissions_and_space(self):
         """Ruxsatlar va disk bo'sh joyini tekshirish"""
         print("\n🔐 PERMISSIONS & DISK SPACE CHECK")
         print("=" * 50)
-        
+
         # Current directory write permission
         current_dir = Path.cwd()
         if os.access(current_dir, os.W_OK):
-            self.log_result("Permission", "Current Dir", "OK", 
-                          f"Yozish ruxsati bor: {current_dir}")
+            self.log_result("Permission", "Current Dir", "OK",
+                            f"Yozish ruxsati bor: {current_dir}")
         else:
-            self.log_result("Permission", "Current Dir", "ERROR", 
-                          f"Yozish ruxsati yo'q: {current_dir}",
-                          f"chmod u+w {current_dir}")
-        
+            self.log_result("Permission", "Current Dir", "ERROR",
+                            f"Yozish ruxsati yo'q: {current_dir}",
+                            f"chmod u+w {current_dir}")
+
         # Important directories
         important_dirs = ['logs', 'downloads', 'local_db', 'results']
         for dir_name in important_dirs:
             dir_path = current_dir / dir_name
             if dir_path.exists():
                 if os.access(dir_path, os.W_OK):
-                    self.log_result("Permission", f"Dir: {dir_name}", "OK", "Yozish ruxsati bor")
+                    self.log_result(
+                        "Permission", f"Dir: {dir_name}", "OK", "Yozish ruxsati bor")
                 else:
-                    self.log_result("Permission", f"Dir: {dir_name}", "ERROR", 
-                                  "Yozish ruxsati yo'q",
-                                  f"chmod u+w {dir_path}")
-        
+                    self.log_result("Permission", f"Dir: {dir_name}", "ERROR",
+                                    "Yozish ruxsati yo'q",
+                                    f"chmod u+w {dir_path}")
+
         # Disk space
         try:
             statvfs = os.statvfs(current_dir)
             free_space = statvfs.f_frsize * statvfs.f_bavail
             free_space_gb = free_space / (1024**3)
-            
+
             if free_space_gb > 10:
-                self.log_result("Disk", "Free Space", "OK", 
-                              f"{free_space_gb:.1f} GB bo'sh joy")
+                self.log_result("Disk", "Free Space", "OK",
+                                f"{free_space_gb:.1f} GB bo'sh joy")
             elif free_space_gb > 2:
-                self.log_result("Disk", "Free Space", "WARN", 
-                              f"{free_space_gb:.1f} GB bo'sh joy - yetarli lekin kam")
+                self.log_result("Disk", "Free Space", "WARN",
+                                f"{free_space_gb:.1f} GB bo'sh joy - yetarli lekin kam")
             else:
-                self.log_result("Disk", "Free Space", "ERROR", 
-                              f"{free_space_gb:.1f} GB bo'sh joy - juda kam")
+                self.log_result("Disk", "Free Space", "ERROR",
+                                f"{free_space_gb:.1f} GB bo'sh joy - juda kam")
         except Exception as e:
-            self.log_result("Disk", "Free Space", "ERROR", f"Tekshirib bo'lmadi: {e}")
-    
+            self.log_result("Disk", "Free Space", "ERROR",
+                            f"Tekshirib bo'lmadi: {e}")
+
     def generate_fix_script(self):
         """Muammolarni hal qilish uchun script yaratish"""
         print("\n🔧 GENERATING FIX SCRIPT")
         print("=" * 50)
-        
+
         fix_commands = []
-        
+
         # Python packages
         if self.python_packages:
             fix_commands.append("# Python packages o'rnatish")
-            fix_commands.append(f"pip install {' '.join(self.python_packages)}")
+            fix_commands.append(
+                f"pip install {' '.join(self.python_packages)}")
             fix_commands.append("")
-        
+
         # System packages
         if self.system_packages:
             fix_commands.append("# System packages o'rnatish")
             fix_commands.append("# Ubuntu/Debian:")
-            fix_commands.append(f"sudo apt update && sudo apt install -y {' '.join(self.system_packages)}")
+            fix_commands.append(
+                f"sudo apt update && sudo apt install -y {' '.join(self.system_packages)}")
             fix_commands.append("# macOS:")
-            fix_commands.append(f"brew install {' '.join(self.system_packages)}")
+            fix_commands.append(
+                f"brew install {' '.join(self.system_packages)}")
             fix_commands.append("")
-        
+
         # Playwright browsers
-        playwright_needed = any(r['name'] == 'Browser Status' and r['status'] == 'ERROR' 
-                               for r in self.results if r['category'] == 'Playwright')
+        playwright_needed = any(r['name'] == 'Browser Status' and r['status'] == 'ERROR'
+                                for r in self.results if r['category'] == 'Playwright')
         if playwright_needed:
             fix_commands.append("# Playwright Chromium o'rnatish")
             fix_commands.append("playwright install chromium")
             fix_commands.append("")
-        
+
         # Create directories
-        missing_dirs = [r['name'].replace('Dir: ', '') for r in self.results 
-                       if r['category'] == 'Structure' and r['status'] == 'ERROR' and 'Dir:' in r['name']]
+        missing_dirs = [r['name'].replace('Dir: ', '') for r in self.results
+                        if r['category'] == 'Structure' and r['status'] == 'ERROR' and 'Dir:' in r['name']]
         if missing_dirs:
             fix_commands.append("# Kerakli papkalar yaratish")
             for dir_name in missing_dirs:
                 fix_commands.append(f"mkdir -p {dir_name}")
             fix_commands.append("")
-        
+
         # Environment file
-        env_needed = any(r['name'] == '.env' and r['status'] == 'ERROR' 
-                        for r in self.results if r['category'] == 'Config')
+        env_needed = any(r['name'] == '.env' and r['status'] == 'ERROR'
+                         for r in self.results if r['category'] == 'Config')
         if env_needed:
             fix_commands.append("# Environment file yaratish")
             fix_commands.append("cp .env.example .env")
-            fix_commands.append("# .env faylni tahrir qiling va kerakli qiymatlarni to'ldiring")
+            fix_commands.append(
+                "# .env faylni tahrir qiling va kerakli qiymatlarni to'ldiring")
             fix_commands.append("")
-        
+
         if fix_commands:
             fix_script_path = Path('fix_system.sh')
             try:
@@ -491,35 +519,37 @@ class SystemDiagnostics:
                     f.write("# Auto-generated system fix script\n")
                     f.write("# " + "="*50 + "\n\n")
                     f.write("\n".join(fix_commands))
-                
+
                 # Make executable
                 os.chmod(fix_script_path, 0o755)
-                
-                self.log_result("Fix", "Script", "OK", 
-                              f"Fix script yaratildi: {fix_script_path}")
+
+                self.log_result("Fix", "Script", "OK",
+                                f"Fix script yaratildi: {fix_script_path}")
                 print(f"   💡 Ishga tushirish: ./fix_system.sh")
             except Exception as e:
-                self.log_result("Fix", "Script", "ERROR", f"Script yaratishda xato: {e}")
+                self.log_result("Fix", "Script", "ERROR",
+                                f"Script yaratishda xato: {e}")
         else:
-            self.log_result("Fix", "Script", "INFO", "Hech qanday fix kerak emas!")
-    
+            self.log_result("Fix", "Script", "INFO",
+                            "Hech qanday fix kerak emas!")
+
     def print_summary(self):
         """Umumiy natijalar"""
         print("\n📊 DIAGNOSTICS SUMMARY")
         print("=" * 60)
-        
+
         total = len(self.results)
         ok_count = len([r for r in self.results if r['status'] == 'OK'])
         warn_count = len([r for r in self.results if r['status'] == 'WARN'])
         error_count = len([r for r in self.results if r['status'] == 'ERROR'])
         info_count = len([r for r in self.results if r['status'] == 'INFO'])
-        
+
         print(f"Jami tekshiruvlar: {total}")
         print(f"✅ Muvaffaqiyatli: {ok_count}")
         print(f"⚠️ Ogohlantirishlar: {warn_count}")
         print(f"❌ Xatolar: {error_count}")
         print(f"📋 Ma'lumotlar: {info_count}")
-        
+
         if error_count == 0 and warn_count <= 2:
             print("\n🎉 Tizim tayyor! Dasturni ishga tushirishingiz mumkin.")
             return True
@@ -527,9 +557,10 @@ class SystemDiagnostics:
             print(f"\n⚠️ Ba'zi ogohlantirishlar bor, lekin dastur ishlashi mumkin.")
             return True
         else:
-            print(f"\n❌ {error_count} ta muhim muammo topildi. Avval ularni hal qiling.")
+            print(
+                f"\n❌ {error_count} ta muhim muammo topildi. Avval ularni hal qiling.")
             return False
-    
+
     def run_full_diagnostics(self, verbose=False):
         """Barcha diagnostikalarni ishga tushirish"""
         # File content header
@@ -542,38 +573,64 @@ class SystemDiagnostics:
             ""
         ]
         self.file_content.extend(header)
-        
+
         if verbose:
             for line in header:
                 print(line)
         else:
             print("🔍 System Diagnostics ishga tushmoqda...")
-            print("📝 Batafsil log: system_diagnostics_report.txt")
-        
+            print("📝 Batafsil log: logs/system_diagnostics_report.txt")
+
         # Silent mode - faqat muhim ma'lumotlar
         quiet_mode = not verbose
-        
+
         self.check_python_environment_quiet() if quiet_mode else self.check_python_environment()
-        self.check_required_python_packages_quiet() if quiet_mode else self.check_required_python_packages()
-        self.check_system_dependencies_quiet() if quiet_mode else self.check_system_dependencies()
+        self.check_required_python_packages_quiet(
+        ) if quiet_mode else self.check_required_python_packages()
+        self.check_system_dependencies_quiet(
+        ) if quiet_mode else self.check_system_dependencies()
         self.check_video_attributes_quiet() if quiet_mode else self.check_video_attributes()
-        self.check_playwright_browsers_quiet() if quiet_mode else self.check_playwright_browsers()
+        self.check_playwright_browsers_quiet(
+        ) if quiet_mode else self.check_playwright_browsers()
         self.check_project_structure_quiet() if quiet_mode else self.check_project_structure()
         self.check_configuration_quiet() if quiet_mode else self.check_configuration()
-        self.check_permissions_and_space_quiet() if quiet_mode else self.check_permissions_and_space()
+        self.check_permissions_and_space_quiet(
+        ) if quiet_mode else self.check_permissions_and_space()
         self.generate_fix_script_quiet() if quiet_mode else self.generate_fix_script()
-        
+
         # Save to file
         self.save_report()
-        
+
         return self.print_summary(verbose=verbose)
-    
+
     def save_report(self):
-        """Diagnostics reportni faylga saqlash"""
+        """Diagnostics reportni faylga saqlash - root va logs papkasiga"""
+        import datetime
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Root papkadagi fayl (eski usul)
+        root_file = self.output_file
+
+        # Logs papkadagi fayl (yangi usul)
+        logs_dir = "logs"
+        os.makedirs(logs_dir, exist_ok=True)
+        logs_file = os.path.join(
+            logs_dir, f"system_diagnostics_{timestamp}.txt")
+
         try:
-            with open(self.output_file, 'w', encoding='utf-8') as f:
+            # Root papkaga saqlash
+            with open(root_file, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(self.file_content))
-            print(f"📄 To'liq report saqlandi: {self.output_file}")
+
+            # Logs papkaga saqlash
+            with open(logs_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(self.file_content))
+
+            print(f"📄 To'liq report saqlandi:")
+            print(f"  - Root: {root_file}")
+            print(f"  - Logs: {logs_file}")
+
         except Exception as e:
             print(f"⚠️ Report saqlab bo'lmadi: {e}")
 
@@ -582,31 +639,35 @@ class SystemDiagnostics:
         """Python environment - quiet mode"""
         self.file_content.append("\n🐍 PYTHON ENVIRONMENT CHECK")
         self.file_content.append("=" * 50)
-        
+
         # Python version - only show if there's an issue
         python_version = platform.python_version()
         major, minor = map(int, python_version.split('.')[:2])
         if major > 3 or (major == 3 and minor >= 8):
-            self.log_result("Python", "Version", "OK", f"Python {python_version}", quiet=True)
+            self.log_result("Python", "Version", "OK",
+                            f"Python {python_version}", quiet=True)
             print("✅ Python version OK")
         else:
-            self.log_result("Python", "Version", "ERROR", f"Python {python_version} - 3.8+ kerak", quiet=False)
-        
+            self.log_result("Python", "Version", "ERROR",
+                            f"Python {python_version} - 3.8+ kerak", quiet=False)
+
         # Virtual environment
         if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-            self.log_result("Python", "Virtual Environment", "OK", f"Active: {sys.prefix}", quiet=True)
+            self.log_result("Python", "Virtual Environment",
+                            "OK", f"Active: {sys.prefix}", quiet=True)
             print("✅ Virtual environment OK")
         else:
-            self.log_result("Python", "Virtual Environment", "WARN", "Virtual environment ishlatilmayapti", quiet=False)
+            self.log_result("Python", "Virtual Environment", "WARN",
+                            "Virtual environment ishlatilmayapti", quiet=False)
 
     def check_required_python_packages_quiet(self):
         """Python packages - quiet mode"""
         self.file_content.append("\n📦 PYTHON PACKAGES CHECK")
         self.file_content.append("=" * 50)
-        
+
         required_packages = {
             'aiohttp': '3.8.0',
-            'playwright': '1.30.0', 
+            'playwright': '1.30.0',
             'beautifulsoup4': '4.10.0',
             'telethon': '1.20.0',
             'tqdm': '4.60.0',
@@ -615,34 +676,42 @@ class SystemDiagnostics:
             'UzTransliterator': '0.0.1',
             'python-dotenv': '0.19.0'
         }
-        
+
         missing_packages = []
         for package_name, min_version in required_packages.items():
             try:
                 if package_name == 'python-dotenv':
                     import dotenv
-                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                    self.log_result("Package", package_name,
+                                    "OK", "Installed", quiet=True)
                 elif package_name == 'ffmpeg-python':
                     import ffmpeg
-                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                    self.log_result("Package", package_name,
+                                    "OK", "Installed", quiet=True)
                 elif package_name == 'imageio-ffmpeg':
                     import imageio_ffmpeg
                     version = getattr(imageio_ffmpeg, '__version__', 'unknown')
-                    self.log_result("Package", package_name, "OK", f"Installed: {version}", quiet=True)
+                    self.log_result("Package", package_name,
+                                    "OK", f"Installed: {version}", quiet=True)
                 elif package_name == 'beautifulsoup4':
                     import bs4  # BeautifulSoup4 imports as bs4
-                    self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                    self.log_result("Package", package_name,
+                                    "OK", "Installed", quiet=True)
                 else:
-                    spec = importlib.util.find_spec(package_name.replace('-', '_'))
+                    spec = importlib.util.find_spec(
+                        package_name.replace('-', '_'))
                     if spec:
-                        self.log_result("Package", package_name, "OK", "Installed", quiet=True)
+                        self.log_result("Package", package_name,
+                                        "OK", "Installed", quiet=True)
                     else:
                         missing_packages.append(package_name)
-                        self.log_result("Package", package_name, "ERROR", "Topilmadi", f"pip install {package_name}", quiet=False)
+                        self.log_result("Package", package_name, "ERROR",
+                                        "Topilmadi", f"pip install {package_name}", quiet=False)
             except ImportError:
                 missing_packages.append(package_name)
-                self.log_result("Package", package_name, "ERROR", "Topilmadi", f"pip install {package_name}", quiet=False)
-        
+                self.log_result("Package", package_name, "ERROR",
+                                "Topilmadi", f"pip install {package_name}", quiet=False)
+
         if not missing_packages:
             print("✅ Barcha Python packages OK")
         else:
@@ -652,101 +721,115 @@ class SystemDiagnostics:
         """System dependencies - quiet mode"""
         self.file_content.append("\n🔧 SYSTEM DEPENDENCIES CHECK")
         self.file_content.append("=" * 50)
-        
+
         # FFmpeg/ffprobe
         ffmpeg_ok = shutil.which('ffmpeg') is not None
         ffprobe_ok = shutil.which('ffprobe') is not None
-        
+
         if ffmpeg_ok and ffprobe_ok:
             print("✅ FFmpeg tools OK")
-            self.log_result("System", "ffmpeg", "OK", f"Found: {shutil.which('ffmpeg')}", quiet=True)
-            self.log_result("System", "ffprobe", "OK", f"Found: {shutil.which('ffprobe')}", quiet=True)
+            self.log_result("System", "ffmpeg", "OK",
+                            f"Found: {shutil.which('ffmpeg')}", quiet=True)
+            self.log_result("System", "ffprobe", "OK",
+                            f"Found: {shutil.which('ffprobe')}", quiet=True)
         else:
             print("❌ FFmpeg tools missing")
             if not ffmpeg_ok:
-                self.log_result("System", "ffmpeg", "ERROR", "FFmpeg topilmadi", "sudo apt install ffmpeg", quiet=False)
+                self.log_result("System", "ffmpeg", "ERROR", "FFmpeg topilmadi",
+                                "sudo apt install ffmpeg", quiet=False)
             if not ffprobe_ok:
-                self.log_result("System", "ffprobe", "ERROR", "FFprobe topilmadi", "sudo apt install ffmpeg", quiet=False)
+                self.log_result("System", "ffprobe", "ERROR",
+                                "FFprobe topilmadi", "sudo apt install ffmpeg", quiet=False)
 
     def check_video_attributes_quiet(self):
-        """Video attributes - quiet mode""" 
+        """Video attributes - quiet mode"""
         self.file_content.append("\n🎬 VIDEO ATTRIBUTES TEST")
         self.file_content.append("=" * 50)
-        
+
         try:
             from telegramuploader.core.uploader import TelegramUploader
             import tempfile
             import subprocess
-            
+
             uploader = TelegramUploader()
-            
+
             with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
                 test_file = tmp.name
-            
+
             try:
                 # 1 sekund test video
                 subprocess.run([
-                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=5', 
+                    'ffmpeg', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=5',
                     '-c:v', 'libx264', '-preset', 'ultrafast', '-t', '1', '-y', test_file
                 ], capture_output=True, timeout=10, check=True)
-                
+
                 attrs = uploader.get_video_attributes(test_file)
-                
+
                 if attrs and attrs.w > 0 and attrs.h > 0 and attrs.duration > 0:
                     print("✅ Video attributes OK")
-                    self.log_result("Video", "Attributes", "OK", f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s", quiet=True)
+                    self.log_result(
+                        "Video", "Attributes", "OK", f"Working: {attrs.w}x{attrs.h}, {attrs.duration}s", quiet=True)
                 else:
                     print("❌ Video attributes FAILED")
-                    self.log_result("Video", "Attributes", "ERROR", "Video attributes failed", quiet=False)
-                
+                    self.log_result("Video", "Attributes", "ERROR",
+                                    "Video attributes failed", quiet=False)
+
             except Exception as e:
                 print("❌ Video test FAILED")
-                self.log_result("Video", "Attributes", "ERROR", f"Video test error: {e}", quiet=False)
+                self.log_result("Video", "Attributes", "ERROR",
+                                f"Video test error: {e}", quiet=False)
             finally:
                 try:
                     os.remove(test_file)
                 except:
                     pass
-                    
+
         except Exception as e:
             print("❌ Video module ERROR")
-            self.log_result("Video", "Attributes", "ERROR", f"Import error: {e}", quiet=False)
+            self.log_result("Video", "Attributes", "ERROR",
+                            f"Import error: {e}", quiet=False)
 
     def check_playwright_browsers_quiet(self):
         """Playwright browsers - quiet mode"""
         self.file_content.append("\n🌐 PLAYWRIGHT BROWSERS CHECK")
         self.file_content.append("=" * 50)
-        
+
         try:
             import playwright
             playwright_cache = Path.home() / ".cache" / "ms-playwright"
             chromium_dirs = list(playwright_cache.glob("chromium-*"))
-            
+
             if chromium_dirs:
                 print("✅ Playwright Chromium OK")
-                self.log_result("Playwright", "Chromium", "OK", "Browser mavjud", quiet=True)
+                self.log_result("Playwright", "Chromium", "OK",
+                                "Browser mavjud", quiet=True)
             else:
                 print("❌ Playwright Chromium MISSING")
-                self.log_result("Playwright", "Chromium", "ERROR", "Chromium topilmadi", "playwright install chromium", quiet=False)
+                self.log_result("Playwright", "Chromium", "ERROR",
+                                "Chromium topilmadi", "playwright install chromium", quiet=False)
         except ImportError:
             print("❌ Playwright NOT INSTALLED")
-            self.log_result("Playwright", "Installation", "ERROR", "Playwright topilmadi", "pip install playwright", quiet=False)
+            self.log_result("Playwright", "Installation", "ERROR",
+                            "Playwright topilmadi", "pip install playwright", quiet=False)
 
     def check_project_structure_quiet(self):
         """Project structure - quiet mode"""
         self.file_content.append("\n📁 PROJECT STRUCTURE CHECK")
         self.file_content.append("=" * 50)
-        
-        required_dirs = ['core', 'scraper', 'filedownloader', 'telegramuploader', 'utils']
+
+        required_dirs = ['core', 'scraper',
+                         'filedownloader', 'telegramuploader', 'utils']
         missing_dirs = []
-        
+
         for dir_name in required_dirs:
             if not os.path.exists(dir_name):
                 missing_dirs.append(dir_name)
-                self.log_result("Structure", f"Dir: {dir_name}", "ERROR", f"Topilmadi: {dir_name}", quiet=False)
+                self.log_result(
+                    "Structure", f"Dir: {dir_name}", "ERROR", f"Topilmadi: {dir_name}", quiet=False)
             else:
-                self.log_result("Structure", f"Dir: {dir_name}", "OK", f"Mavjud: {os.path.abspath(dir_name)}", quiet=True)
-        
+                self.log_result(
+                    "Structure", f"Dir: {dir_name}", "OK", f"Mavjud: {os.path.abspath(dir_name)}", quiet=True)
+
         if not missing_dirs:
             print("✅ Project structure OK")
         else:
@@ -756,49 +839,56 @@ class SystemDiagnostics:
         """Configuration - quiet mode"""
         self.file_content.append("\n⚙️ CONFIGURATION CHECK")
         self.file_content.append("=" * 50)
-        
+
         env_file_exists = os.path.exists('.env')
-        
+
         if env_file_exists:
             print("✅ Configuration OK")
-            self.log_result("Config", ".env", "OK", "Environment file mavjud", quiet=True)
+            self.log_result("Config", ".env", "OK",
+                            "Environment file mavjud", quiet=True)
         else:
             print("⚠️ .env file missing")
-            self.log_result("Config", ".env", "WARN", ".env fayli topilmadi", "cp .env.example .env", quiet=False)
+            self.log_result("Config", ".env", "WARN", ".env fayli topilmadi",
+                            "cp .env.example .env", quiet=False)
 
     def check_permissions_and_space_quiet(self):
         """Permissions and space - quiet mode"""
         self.file_content.append("\n🔐 PERMISSIONS & DISK SPACE CHECK")
         self.file_content.append("=" * 50)
-        
+
         # Disk space
         try:
             current_dir = Path.cwd()
             statvfs = os.statvfs(current_dir)
             free_space = statvfs.f_frsize * statvfs.f_bavail
             free_space_gb = free_space / (1024**3)
-            
+
             if free_space_gb > 10:
                 print("✅ Disk space OK")
-                self.log_result("Disk", "Free Space", "OK", f"{free_space_gb:.1f} GB bo'sh joy", quiet=True)
+                self.log_result("Disk", "Free Space", "OK",
+                                f"{free_space_gb:.1f} GB bo'sh joy", quiet=True)
             elif free_space_gb > 2:
                 print("⚠️ Disk space LOW")
-                self.log_result("Disk", "Free Space", "WARN", f"{free_space_gb:.1f} GB bo'sh joy - yetarli lekin kam", quiet=False)
+                self.log_result("Disk", "Free Space", "WARN",
+                                f"{free_space_gb:.1f} GB bo'sh joy - yetarli lekin kam", quiet=False)
             else:
                 print("❌ Disk space CRITICAL")
-                self.log_result("Disk", "Free Space", "ERROR", f"{free_space_gb:.1f} GB bo'sh joy - juda kam", quiet=False)
+                self.log_result("Disk", "Free Space", "ERROR",
+                                f"{free_space_gb:.1f} GB bo'sh joy - juda kam", quiet=False)
         except Exception as e:
             print("❌ Disk space CHECK FAILED")
-            self.log_result("Disk", "Free Space", "ERROR", f"Tekshirib bo'lmadi: {e}", quiet=False)
+            self.log_result("Disk", "Free Space", "ERROR",
+                            f"Tekshirib bo'lmadi: {e}", quiet=False)
 
     def generate_fix_script_quiet(self):
         """Generate fix script - quiet mode"""
         self.file_content.append("\n🔧 GENERATING FIX SCRIPT")
         self.file_content.append("=" * 50)
-        
+
         if not self.python_packages and not self.system_packages:
             print("✅ No fixes needed")
-            self.log_result("Fix", "Script", "INFO", "Hech qanday fix kerak emas!", quiet=True)
+            self.log_result("Fix", "Script", "INFO",
+                            "Hech qanday fix kerak emas!", quiet=True)
         else:
             print("🔧 Fix script generated")
             # ... fix script logic remains the same
@@ -810,7 +900,7 @@ class SystemDiagnostics:
         warn_count = sum(1 for r in self.results if r['status'] == 'WARN')
         error_count = sum(1 for r in self.results if r['status'] == 'ERROR')
         info_count = sum(1 for r in self.results if r['status'] == 'INFO')
-        
+
         summary = [
             "\n📊 DIAGNOSTICS SUMMARY",
             "=" * 60,
@@ -821,12 +911,12 @@ class SystemDiagnostics:
             f"📋 Ma'lumotlar: {info_count}",
             ""
         ]
-        
+
         self.file_content.extend(summary)
-        
+
         for line in summary:
             print(line)
-        
+
         if error_count == 0 and warn_count <= 2:
             result_msg = "🎉 Tizim tayyor! Dasturni ishga tushirishingiz mumkin."
             print(result_msg)
@@ -849,7 +939,7 @@ def main():
     try:
         diagnostics = SystemDiagnostics()
         success = diagnostics.run_full_diagnostics()
-        
+
         if success:
             print("\n🚀 Tayyor! Dasturni ishga tushiring:")
             print("   python main.py")
@@ -858,7 +948,7 @@ def main():
             print("\n🔧 Avval muammolarni hal qiling, keyin qayta tekshiring:")
             print("   python utils/system_diagnostics.py")
             return 1
-            
+
     except KeyboardInterrupt:
         print("\n⚠️ Diagnostics to'xtatildi")
         return 130

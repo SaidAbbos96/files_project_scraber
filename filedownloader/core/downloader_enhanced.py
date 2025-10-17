@@ -153,7 +153,7 @@ class FileDownloader:
         Backward compatibility wrapper - uses new retry logic
         """
         return await self.download_file_with_retry(session, semaphore, file_url, output_path, filename)
-
+    
     async def get_file_size(self, session: aiohttp.ClientSession, file_url: str) -> int:
         """
         URL dan fayl hajmini olish (HEAD request bilan)
@@ -174,56 +174,6 @@ class FileDownloader:
         except Exception as e:
             logger.debug(f"🔍 HEAD request failed: {e}")
             return 0
-
-    def prepare_download_path(self, title: str, file_url: str, download_dir: str) -> Tuple[str, str]:
-        """
-        Download path va filename tayyorlash
-
-        Args:
-            title: File title
-            file_url: File URL
-            download_dir: Download directory
-
-        Returns:
-            (output_path, filename) tuple
-        """
-        # Extension extraction
-        ext = Path(file_url).suffix or ".mp4"
-
-        # Clean title and create filename
-        clean_title_str = clean_title(title or "untitled")
-        filename = safe_filename(clean_title_str, ext)
-
-        # Full output path
-        output_path = os.path.join(download_dir, filename)
-
-        return output_path, filename
-
-    def check_file_exists(self, output_path: str, expected_size: int = 0) -> Tuple[bool, str]:
-        """
-        Fayl mavjudligini va butunligini tekshirish
-
-        Args:
-            output_path: File path
-            expected_size: Expected file size (0 = don't check)
-
-        Returns:
-            (exists_and_valid, reason) tuple
-        """
-        if not os.path.exists(output_path):
-            return False, "File does not exist"
-
-        actual_size = os.path.getsize(output_path)
-        if actual_size == 0:
-            return False, "File is empty"
-
-        if expected_size > 0:
-            # Size tolerance check (1% or minimum 1MB)
-            tolerance = max(expected_size * 0.01, 1024 * 1024)
-            if abs(actual_size - expected_size) > tolerance:
-                return False, f"Size mismatch: expected {expected_size}, got {actual_size}"
-
-        return True, f"File exists and valid ({actual_size} bytes)"
 
     async def download_multiple_files(self, files_data: list, download_dir: str, 
                                     concurrency: int = 2) -> Tuple[int, int]:
@@ -300,39 +250,3 @@ class FileDownloader:
             
         logger.info(f"📊 Download summary: {successful} successful, {failed} failed")
         return successful, failed
-
-
-class ProgressTracker:
-    """Download progress tracking utility"""
-
-    def __init__(self):
-        self.total_files = 0
-        self.completed_files = 0
-        self.failed_files = 0
-        self.total_bytes = 0
-        self.downloaded_bytes = 0
-
-    def set_total_files(self, count: int):
-        """Set total files to download"""
-        self.total_files = count
-
-    def file_completed(self, size: int):
-        """Mark file as completed"""
-        self.completed_files += 1
-        self.downloaded_bytes += size
-
-    def file_failed(self):
-        """Mark file as failed"""
-        self.failed_files += 1
-
-    def get_progress_info(self) -> Dict[str, Any]:
-        """Get current progress information"""
-        return {
-            "total_files": self.total_files,
-            "completed_files": self.completed_files,
-            "failed_files": self.failed_files,
-            "success_rate": (self.completed_files / self.total_files * 100) if self.total_files else 0,
-            "total_bytes": self.total_bytes,
-            "downloaded_bytes": self.downloaded_bytes,
-            "remaining_files": self.total_files - self.completed_files - self.failed_files
-        }

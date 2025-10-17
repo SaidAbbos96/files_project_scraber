@@ -247,12 +247,15 @@ files_project_scraber/
 │   └── files.py              # File operations
 │
 ├── 📁 downloads/             # Downloaded files storage
-├── 📁 results/               # Processing results
+├── 📁 results/               # Processing results  
 ├── 📁 logs/                  # Application logs
 ├── 📁 local_db/              # Local databases
 ├── 📁 finish/                # Completed processing
 ├── 📁 info/                  # Documentation
-└── 📁 test/                  # Test files
+├── 📁 scripts/               # Shell scripts
+│   ├── git/                  # Git automation scripts
+│   └── maintenance/          # System maintenance scripts
+└── 📁 tests/                 # Test files
 ```
 
 ## 🛠️ Texnologiyalar - Optimizatsiya qilingan
