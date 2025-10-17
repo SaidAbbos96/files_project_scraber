@@ -14,7 +14,7 @@ LOGGING_ENABLED = os.getenv(
     "LOGGING_ENABLED", "True").lower() in ("true", "1", "yes")
 FILE_MIN_SIZE = int(
     os.getenv("FILE_MIN_SIZE", str(1024 * 1024)))  # Default: 1MB
-DB_PATH = os.getenv("DB_PATH", f"local_db/{DB_LOCAL_NAME}.db")
+DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
 # --- Umumiy sozlamalar ---
 APP_CONFIG = {
     # --- Directory Settings ---
