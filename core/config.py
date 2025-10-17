@@ -73,7 +73,7 @@ APP_CONFIG = {
     # ✅ PARALLEL (parallel, bir nechta fayl bir vaqtda)
     "mode": "parallel",
     "debug": False,
-    "sort_by_size": True,           # Eng kichik fayldan boshlash uchun
+    "sort_by_size": False,           # Eng kichik fayldan boshlash uchun
 
     # --- Streaming Settings ---
     # Stream orqali yuklash (disk ga saqlamasdan)
