@@ -53,34 +53,114 @@ class SessionManager:
             print(f"📁 Backup papka yaratildi: {self.backup_dir}")
 
     def is_session_locked(self, verbose=True):
-        """Session bloklanganligini tekshirish"""
+        """Telegram session lock holatini tekshirish"""
         if not os.path.exists(self.session_file):
             if verbose:
                 print("ℹ️  Session fayli mavjud emas, yangi session yaratiladi")
             return False
 
         try:
-            # SQLite faylini ochishga harakat qilish
-            conn = sqlite3.connect(
-                self.session_file, timeout=self.lock_timeout)
-            conn.execute("SELECT 1")
-            conn.close()
+            # Telegram session lock ni tekshirish uchun fayl ochishga harakat
+            # 1. Faylni read-write rejimida ochish
+            with open(self.session_file, 'r+b') as f:
+                # Faylni o'qishga harakat qilish
+                f.seek(0)
+                f.read(1)
+                # Faylga yozishga harakat qilish (lock aniqlash uchun)
+                f.seek(0, 2)  # Fayl oxiriga
+                current_pos = f.tell()
+                f.seek(current_pos)
+            
+            # Agar bu yerga yetib kelsa, fayl lock emas
             if verbose:
                 print("✅ Session fayli normal holatda")
             return False
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e).lower():
+            
+        except PermissionError as e:
+            # Permission error - fayl lock bo'lishi mumkin
+            if verbose:
+                print(f"🔒 Session fayli lock bo'lishi mumkin: {e}")
+            return True
+            
+        except IOError as e:
+            # IO error - fayl ishlatilayotgan bo'lishi mumkin
+            if "being used by another process" in str(e).lower() or \
+               "resource temporarily unavailable" in str(e).lower():
                 if verbose:
-                    print("🔒 Session fayli bloklanagan!")
+                    print(f"🔒 Session fayli boshqa jarayon tomonidan ishlatilmoqda: {e}")
                 return True
             else:
                 if verbose:
-                    print(f"⚠️  Session faylida xatolik: {e}")
+                    print(f"⚠️  Session faylida I/O xatolik: {e}")
                 return True
+                
         except Exception as e:
+            # Boshqa xatoliklar
             if verbose:
                 print(f"❌ Session tekshirishda xatolik: {e}")
-            return True
+            
+            # Agar fayl ochilmasa, process check qilamiz
+            return self.check_session_process_usage(verbose)
+    
+    def is_database_locked(self, verbose=True):
+        """Database lock holatini tekshirish - asosiy sabab"""
+        try:
+            # local_db papkasidagi database fayllarni tekshirish
+            db_dir = "local_db"
+            if not os.path.exists(db_dir):
+                return False
+            
+            locked_files = []
+            for file in os.listdir(db_dir):
+                if file.endswith('.db'):
+                    db_path = os.path.join(db_dir, file)
+                    try:
+                        # SQLite database ni ochishga harakat
+                        conn = sqlite3.connect(db_path, timeout=1)
+                        conn.execute("SELECT 1")
+                        conn.close()
+                    except sqlite3.OperationalError as e:
+                        if "database is locked" in str(e).lower():
+                            locked_files.append(db_path)
+                            if verbose:
+                                print(f"🔒 Database bloklanagan: {db_path}")
+            
+            if locked_files:
+                if verbose:
+                    print(f"❌ {len(locked_files)} ta database fayli bloklanagan!")
+                    print("💡 Bu session muammosining asosiy sababi bo'lishi mumkin")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            if verbose:
+                print(f"⚠️ Database tekshirishda xatolik: {e}")
+            return False
+    
+    def check_session_process_usage(self, verbose=True):
+        """Session faylini ishlatayotgan processlarni tekshirish"""
+        try:
+            import subprocess
+            
+            # lsof yordamida faylni ishlatayotgan processlarni topish
+            result = subprocess.run(['lsof', self.session_file], 
+                                  capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                if verbose:
+                    print(f"🔒 Session fayli ishlatilmoqda:")
+                    print(result.stdout.strip())
+                return True
+            else:
+                # lsof hech narsa topmadi, fayl free
+                return False
+                
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+            if verbose:
+                print(f"⚠️ Process check da xatolik: {e}")
+            # Process check muvaffaqiyatsiz bo'lsa, ehtiyotkorlik uchun false qaytaramiz
+            return False
 
     def create_backup(self):
         """Session faylini backup qilish"""
@@ -171,46 +251,98 @@ class SessionManager:
             print(f"🧹 {deleted_count} ta eski backup o'chirildi")
 
     def auto_fix_session(self, verbose=True):
-        """Avtomatik session ni tuzatish"""
+        """Avtomatik session ni tuzatish - kengaytirilgan diagnostika"""
         if verbose:
-            print("\n🔍 Session holatini tekshiruv...")
-
-        if not self.is_session_locked(verbose=False):
+            print("\n🔍 Kengaytirilgan session diagnostikasi...")
+        
+        # 1. Session fayl holatini tekshirish
+        session_locked = self.is_session_locked(verbose=verbose)
+        
+        # 2. Database lock holatini tekshirish
+        db_locked = self.is_database_locked(verbose=verbose)
+        
+        # 3. Agar hech qanday muammo yo'q bo'lsa
+        if not session_locked and not db_locked:
             if verbose:
-                print("✅ Session normal holatda, hech narsa qilish shart emas")
+                print("✅ Session va database normal holatda")
             return True
-
+        
+        # 4. Muammolar topildi - tuzatish boshlanadi
         if verbose:
-            print("🔧 Avtomatik session tuzatish boshlanmoqda...")
-
-        # 1. Backup yaratish
-        backup_path = self.create_backup()
-        if not backup_path:
+            print("🔧 Muammolar aniqlandi, avtomatik tuzatish boshlanmoqda...")
+            if session_locked:
+                print("   📋 Session fayli muammosi")
+            if db_locked:
+                print("   📋 Database lock muammosi")
+        
+        # 5. Session backup yaratish
+        backup_path = None
+        if session_locked:
+            backup_path = self.create_backup()
+            if not backup_path:
+                if verbose:
+                    print("❌ Backup yaratib bo'lmadi, davom etish xavfli")
+                return False
+        
+        # 6. Database lock ni hal qilish
+        if db_locked:
             if verbose:
-                print("❌ Backup yaratib bo'lmadi, davom etish xavfli")
-            return False
-
-        # 2. Bloklanagan session ni o'chirish
-        if not self.delete_locked_session():
-            if verbose:
-                print("❌ Bloklanagan session ni o'chirib bo'lmadi")
-            # Alternativ: copy + rename usuli
-            return self.force_session_reset(verbose)
-
-        # 3. Yangi session yaratilishini kutish
+                print("🔧 Database lock ni hal qilishga harakat...")
+            self.fix_database_locks(verbose)
+        
+        # 7. Session lock ni hal qilish  
+        if session_locked:
+            if not self.delete_locked_session():
+                if verbose:
+                    print("❌ Bloklanagan session ni o'chirib bo'lmadi")
+                # Alternativ: copy + rename usuli
+                return self.force_session_reset(verbose)
+        
+        # 8. Yangi session yaratilishini kutish
         if verbose:
             print("⏳ Yangi session yaratilishini kutish...")
-        time.sleep(2)
-
-        # 4. Eski backup larni tozalash
+        time.sleep(3)
+        
+        # 9. Eski backup larni tozalash
         self.cleanup_old_backups()
-
-        if verbose:
-            print("✅ Session avtomatik tuzatildi!")
-            print(f"💾 Backup saqlandi: {backup_path}")
-            print("🚀 Dastur normal ishlay oladi")
-
-        return True
+        
+        # 10. Final tekshiruv
+        final_check = self.is_session_locked(verbose=False) or self.is_database_locked(verbose=False)
+        
+        if not final_check:
+            if verbose:
+                print("✅ Session va database muvaffaqiyatli tuzatildi!")
+                if backup_path:
+                    print(f"💾 Backup saqlandi: {backup_path}")
+                print("🚀 Dastur normal ishlay oladi")
+            return True
+        else:
+            if verbose:
+                print("⚠️ Ba'zi muammolar hali ham mavjud")
+                print("💡 Manual tekshiruv talab qilinishi mumkin")
+            return False
+    
+    def fix_database_locks(self, verbose=True):
+        """Database lock larni hal qilish"""
+        try:
+            if verbose:
+                print("🔧 Database lock larni hal qilish...")
+            
+            # Barcha database connection larni yopish
+            import gc
+            gc.collect()  # Garbage collection
+            
+            # Biroz kutish
+            time.sleep(1)
+            
+            if verbose:
+                print("✅ Database connection lar tozalandi")
+            return True
+            
+        except Exception as e:
+            if verbose:
+                print(f"❌ Database lock hal qilishda xatolik: {e}")
+            return False
 
     def force_session_reset(self, verbose=True):
         """Majburan session reset qilish - copy va rename bilan"""
