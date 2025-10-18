@@ -23,7 +23,8 @@ APP_CONFIG = {
     "finish_dir": os.getenv("FINISH_DIR", "finish"),
 
     # --- Concurrency Settings - Environment'dan o'qiladi ---
-    "concurrency": int(os.getenv("DOWNLOAD_CONCURRENCY", "2")),  # Backward compatibility
+    # Backward compatibility
+    "concurrency": int(os.getenv("DOWNLOAD_CONCURRENCY", "2")),
     "scrape_concurrency": int(os.getenv("SCRAPE_CONCURRENCY", "5")),
     "download_concurrency": int(os.getenv("DOWNLOAD_CONCURRENCY", "2")),
     "download_base_timeout": int(os.getenv("DOWNLOAD_BASE_TIMEOUT", "1800")),
@@ -50,7 +51,8 @@ APP_CONFIG = {
     "notification_rate_limit": float(os.getenv("NOTIFICATION_RATE_LIMIT", "1.0")),
 
     # --- Telegram Settings - Environment'dan o'qiladi ---
-    "telegram_group": os.getenv("TELEGRAM_GROUP", None),  # Override default group
+    # Override default group
+    "telegram_group": os.getenv("TELEGRAM_GROUP", None),
 
     # --- Disk Monitoring Settings - Environment'dan o'qiladi ---
     "disk_monitor_enabled": os.getenv("DISK_MONITOR_ENABLED", "true").lower() in ("true", "1", "yes"),
@@ -61,7 +63,8 @@ APP_CONFIG = {
     "file_max_age_hours": float(os.getenv("FILE_MAX_AGE_HOURS", "1")),
 
     # --- Mode Settings - Environment'dan o'qiladi ---
-    "work_mode": os.getenv("WORK_MODE", None),  # "1" - scrape, "2" - download, "3" - download+upload
+    # "1" - scrape, "2" - download, "3" - download+upload
+    "work_mode": os.getenv("WORK_MODE", None),
     "mode": os.getenv("MODE", "parallel"),       # parallel/sequential
     "debug": os.getenv("DEBUG", "false").lower() in ("true", "1", "yes"),
     "sort_by_size": os.getenv("SORT_BY_SIZE", "false").lower() in ("true", "1", "yes"),
@@ -74,7 +77,7 @@ APP_CONFIG = {
 MAX_SIZE_BYTES = 4 * 1024 * 1024 * 1024  # 4GB
 BROWSER_CONFIG = {
     "browser": "chromium",  # chromium | firefox | webkit
-    "headless": True,
+    "headless": int(os.getenv("HEADLESS", "1")) == 1,
     "viewport": {"width": 1280, "height": 720},
     "user_agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -103,11 +106,11 @@ FILES_GROUP_LINK = os.getenv(
 def make_config(site_config, overrides=None):
     """
     Config yaratish funksiyasi
-    
+
     Args:
         site_config: Site-specific konfiguratsiya
         overrides: Qo'shimcha override qilingan sozlamalar
-    
+
     Returns:
         dict: To'liq konfiguratsiya
     """
@@ -121,13 +124,13 @@ def make_config(site_config, overrides=None):
 # ==========================================
 # CONFIGURATION NOTES
 # ==========================================
-# 
+#
 # Tez-tez o'zgaradigan sozlamalar .env faylida:
 # - SCRAPE_CONCURRENCY: Performance tuning
 # - DOWNLOAD_CONCURRENCY: Download speed
 # - UPLOAD_CONCURRENCY: Upload speed
 # - SLEEP_MIN/MAX: Rate limiting
-# - MIN_FREE_SPACE_GB: Disk management  
+# - MIN_FREE_SPACE_GB: Disk management
 # - MODE: parallel/sequential
 # - DEBUG: Development mode
 #

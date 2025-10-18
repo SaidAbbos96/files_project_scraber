@@ -63,7 +63,7 @@ SITE_CONFIGS = {
         "pagination_selector": None,
         "pagination_link": "https://go4.ruhab.online/top-rated/{page}/",
         "pagination_pages": 135,
-        "card_selector": "#list_videos_common_videos_list_items",
+        "card_selector": "#list_videos_common_videos_list_items div.item.thumb.video-block",
         "fields": {
             "title": ".video-title-holder h1::text",
             "categories": "div.full-body > div > div:nth-child(1) > span:nth-child(2)::text",
