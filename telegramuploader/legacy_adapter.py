@@ -281,43 +281,54 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
             db_local_path = db_file.get("local_path", "")
             
             # Local path mavjud bo'lsa va fayl nomi mos kelsa
-            if db_local_path and Path(db_local_path).name == local_filename:
-                telegram_uploaded = db_file.get("telegram_uploaded", False)
-                db_file_size = db_file.get("file_size", 0)
-                
-                logger.info(f"🎯 PATH MATCH: '{local_filename}'")
-                logger.info(f"   DB path: {db_local_path}")
-                logger.info(f"   Hajm: lokal={local_size:,} vs db={db_file_size:,}")
-                logger.info(f"   Telegram: {telegram_uploaded}")
-                
-                # File size check - 1% tolerance
-                size_diff = abs(local_size - db_file_size) if db_file_size > 0 else 0
-                size_tolerance = max(local_size * 0.01, 1024)  # 1% yoki 1KB
-                
-                if db_file_size > 0 and size_diff > size_tolerance:
-                    logger.warning(f"⚠️ Hajm mos kelmaydi: {size_diff:,} bytes farq")
-                    logger.info(f"🗑️ Buzuq fayl o'chiriladi: {local_filename}")
-                    try:
-                        os.remove(local_file)
-                        logger.info(f"✅ O'chirildi: {local_filename}")
-                    except Exception as e:
-                        logger.error(f"❌ O'chirishda xato: {e}")
-                    file_matched = True
+            if db_local_path:
+                try:
+                    db_filename = Path(db_local_path).name
+                    if db_filename == local_filename:
+                        file_matched = True
+                except:
+                    # Path parse qila olmasa, string comparison
+                    if local_filename in db_local_path:
+                        file_matched = True
+                    else:
+                        continue
+                        
+                if file_matched:
+                    telegram_uploaded = db_file.get("telegram_uploaded", False)
+                    db_file_size = db_file.get("file_size", 0)
+                    
+                    logger.info(f"🎯 PATH MATCH: '{local_filename}'")
+                    logger.info(f"   DB path: {db_local_path}")
+                    logger.info(f"   Hajm: lokal={local_size:,} vs db={db_file_size:,}")
+                    logger.info(f"   Telegram: {telegram_uploaded}")
+                    
+                    # File size check - 1% tolerance
+                    size_diff = abs(local_size - db_file_size) if db_file_size > 0 else 0
+                    size_tolerance = max(local_size * 0.01, 1024)  # 1% yoki 1KB
+                    
+                    if db_file_size > 0 and size_diff > size_tolerance:
+                        logger.warning(f"⚠️ Hajm mos kelmaydi: {size_diff:,} bytes farq")
+                        logger.info(f"🗑️ Buzuq fayl o'chiriladi: {local_filename}")
+                        try:
+                            os.remove(local_file)
+                            logger.info(f"✅ O'chirildi: {local_filename}")
+                        except Exception as e:
+                            logger.error(f"❌ O'chirishda xato: {e}")
+                        break
+                    
+                    # Faqat telegram'ga yuklanmagan fayllarni qo'shish
+                    if not telegram_uploaded:
+                        matched_files.append({
+                            "local_path": str(local_file),
+                            "db_file": db_file,
+                            "file_size": local_size,
+                            "db_id": db_file.get("id")  # Database ID ni saqlash
+                        })
+                        logger.info(f"✅ Yuklash uchun qo'shildi: {local_filename}")
+                    else:
+                        logger.info(f"⏭️ Allaqachon yuklangan: {local_filename}")
+                    
                     break
-                
-                # Faqat telegram'ga yuklanmagan fayllarni qo'shish
-                if not telegram_uploaded:
-                    matched_files.append({
-                        "local_path": str(local_file),
-                        "db_file": db_file,
-                        "file_size": local_size
-                    })
-                    logger.info(f"✅ Yuklash uchun qo'shildi: {local_filename}")
-                else:
-                    logger.info(f"⏭️ Allaqachon yuklangan: {local_filename}")
-                
-                file_matched = True
-                break
         
         if not file_matched:
             unmatched_files.append(local_filename)
@@ -377,10 +388,9 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
                 
                 if success:
                     # Database'da telegram_uploaded = True qilish
-                    db.update_file_status(
-                        file_url=db_file["file_url"],
-                        telegram_uploaded=True
-                    )
+                    db_id = file_info.get("db_id")
+                    if db_id:
+                        db.update_file(db_id, telegram_uploaded=True)
                     uploaded_count += 1
                     logger.info(f"✅ Yuklandi: {Path(local_path).name}")
                     
