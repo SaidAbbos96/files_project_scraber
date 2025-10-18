@@ -11,6 +11,7 @@ from core.config import APP_CONFIG, BROWSER_CONFIG, DB_PATH
 from core.site_configs import SITE_CONFIGS
 from telegramuploader.legacy_adapter import download_and_upload, upload_only_mode
 from utils.system_diagnostics import SystemDiagnostics
+from session_manager import SessionManager
 
 
 def safe_input(prompt: str, default: str = "") -> str:
@@ -25,6 +26,14 @@ def safe_input(prompt: str, default: str = "") -> str:
 async def main():
     logger.info("🚀 Files Project Scraper")
     logger.info("=" * 50)
+    
+    # 🔧 Session Manager - avtomatik session tekshiruv va tuzatish
+    session_manager = SessionManager()
+    # Xabarsiz tekshiruv - faqat kerak bo'lgandagina xabar beradi
+    if session_manager.is_session_locked(verbose=False):
+        logger.info("🔧 Session bloklanagan, avtomatik tuzatish...")
+        session_manager.auto_fix_session(verbose=True)
+    # Aks holda xabarsiz tekshiruv
 
     # 1️⃣ Avval config tanlaymiz
     logger.info("📋 Mavjud configlar:")
@@ -38,6 +47,8 @@ async def main():
     logger.info("[clear-cache] Downloads papkasini tozalash")
     logger.info("[clear-db] Database faylini tozalash")
     logger.info("[fix-session] Telegram session lock muammosini hal qilish")
+    logger.info("[session-restore] Backup dan session tiklash")
+    logger.info("[session-list] Session backup larni ko'rish")
 
     choice = safe_input("\nTanlang (raqam yoki komanda) → ")
 
@@ -71,8 +82,15 @@ async def main():
         return
 
     elif choice.lower() == "fix-session":
-        await fix_telegram_session_lock()
+        session_manager.auto_fix_session()
         return
+    
+    elif choice.lower() == "session-restore":
+        session_manager.interactive_restore()
+        return
+    
+    elif choice.lower() == "session-list":
+        show_session_backups(session_manager)
         return
 
     # Config tanlash
@@ -792,6 +810,35 @@ async def delete_local_file(file_data):
 
     except Exception as e:
         logger.error(f"❌ Faylni o'chirishda xato: {e}")
+
+
+def show_session_backups(session_manager):
+    """Session backup larni ko'rsatish"""
+    logger.info("\n📋 Session Backup fayllar:")
+    logger.info("=" * 50)
+    
+    backups = session_manager.list_backups()
+    
+    if not backups:
+        logger.info("📁 Hech qanday backup topilmadi")
+        return
+    
+    logger.info(f"📊 Jami backup fayllar: {len(backups)} ta")
+    
+    for i, backup in enumerate(backups, 1):
+        size_mb = backup['size'] / 1024 / 1024
+        time_str = backup['time'].strftime("%Y-%m-%d %H:%M:%S")
+        logger.info(f"{i:2d}. {backup['name']}")
+        logger.info(f"    📏 Hajmi: {size_mb:.1f} MB")
+        logger.info(f"    📅 Yaratilgan: {time_str}")
+        logger.info(f"    📁 Path: {backup['path']}")
+        logger.info("")
+    
+    # Interaktiv restore taklif qilish
+    if len(backups) > 0:
+        restore_choice = safe_input("Backup dan tiklashni xohlaysizmi? (y/n): ", "n").lower()
+        if restore_choice in ['y', 'yes', 'ha']:
+            session_manager.interactive_restore()
 
 
 if __name__ == "__main__":
