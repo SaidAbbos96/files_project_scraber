@@ -10,27 +10,27 @@ from session_manager import SessionManager
 
 def create_database_lock():
     """Database lock simulatsiyasi"""
-    db_path = "local_db/local_files.db"
+    db_path = "local_db/local_files.db"  # Real database
     
-    # Database papkasini yaratish
-    os.makedirs("local_db", exist_ok=True)
+    print(f"🔒 Real database lock simulatsiyasi: {db_path}")
     
-    print(f"🔒 Database lock simulatsiyasi: {db_path}")
+    if not os.path.exists(db_path):
+        print(f"❌ Database fayli mavjud emas: {db_path}")
+        return
     
     try:
-        # Database yaratish
+        # Real database ni lock qilish
         conn = sqlite3.connect(db_path)
-        conn.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER)")
-        conn.execute("INSERT INTO test (id) VALUES (1)")
+        cursor = conn.cursor()
         
-        # Uzun muddatli transaction
-        conn.execute("BEGIN EXCLUSIVE")
+        # Exclusive lock bilan transaction boshlash
+        cursor.execute("BEGIN EXCLUSIVE")
         print("🔒 Database bloklanıdi!")
         
         # Session Manager test qilish
         manager = SessionManager()
         print("\n" + "="*50)
-        print("Session Manager test - database lock holatida:")
+        print("Session Manager test - real database lock:")
         result = manager.auto_fix_session(verbose=True)
         
         if result:
@@ -38,10 +38,10 @@ def create_database_lock():
         else:
             print("❌ Session Manager da muammo!")
         
-        print("\n⏳ 10 soniya kutish...")
-        time.sleep(10)
+        print("\n⏳ 5 soniya kutish...")
+        time.sleep(5)
         
-        conn.rollback()
+        cursor.execute("ROLLBACK")
         conn.close()
         print("🔓 Database unlock qilindi")
         

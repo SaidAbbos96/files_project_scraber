@@ -115,8 +115,8 @@ class SessionManager:
                 if file.endswith('.db'):
                     db_path = os.path.join(db_dir, file)
                     try:
-                        # SQLite database ni ochishga harakat
-                        conn = sqlite3.connect(db_path, timeout=1)
+                        # SQLite database ni ochishga harakat - qisqa timeout
+                        conn = sqlite3.connect(db_path, timeout=0.1)  # 0.1 soniya timeout
                         conn.execute("SELECT 1")
                         conn.close()
                     except sqlite3.OperationalError as e:
