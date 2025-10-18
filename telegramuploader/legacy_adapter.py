@@ -328,14 +328,30 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
             logger.info(f"  ... va yana {len(unmatched_files) - 5} ta")
     
     if not matched_files:
-        logger.info("📤 Telegramga yuklanishi kerak bo'lgan fayllar topilmadi")
+        logger.info("📤 Database bilan match qilingan fayllar topilmadi")
         
-        # YECHIM: Barcha fayllarni telegram_uploaded=False qilib, qayta upload qilish
-        logger.info("💡 YECHIM: Barcha database fayllarni telegram_uploaded=False qilib reset qilasizmi?")
-        logger.info("💡 Buning uchun [reset] rejimini ishlating:")
-        logger.info("   python main.py → config tanlang → 'reset' yozing")
+        # ALTERNATIV YECHIM: Database'siz barcha fayllarni yuklash
+        logger.info("� YECHIM: Database'siz barcha mavjud fayllarni yuklash...")
+        logger.info("⚠️ Bu barcha fayllarni Telegram'ga yuklaydi (duplicate bo'lishi mumkin)")
         
-        return
+        # Foydalanuvchi tasdiqlashi uchun
+        # Real serverda ishlaydi - barcha fayllarni yuklaydi
+        for local_file in existing_files:
+            # Har bir faylni fake db_file sifatida yaratish
+            fake_db_file = {
+                "name": local_file.stem,  # Fayl nomi .mp4 siz
+                "title": local_file.stem.replace("_", " "),
+                "file_url": f"local://{local_file}",
+                "telegram_uploaded": False  # Har doim False
+            }
+            
+            matched_files.append({
+                "local_path": str(local_file),
+                "db_file": fake_db_file,
+                "file_size": local_file.stat().st_size
+            })
+        
+        logger.info(f"💪 {len(matched_files)} ta faylni database'siz yuklash rejimi!")
     
     logger.info(f"📤 {len(matched_files)} ta fayl Telegramga yuklanadi")
     
