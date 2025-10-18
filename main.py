@@ -149,6 +149,9 @@ async def fix_telegram_session_lock():
             "telegramuploader/session.session-shm"
         ]
         
+
+
+        
         # 2. Session fayllarini backup va o'chirish
         session_backup_dir = Path("session_backup")
         session_backup_dir.mkdir(exist_ok=True)
