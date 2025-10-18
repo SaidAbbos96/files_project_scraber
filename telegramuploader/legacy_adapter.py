@@ -251,7 +251,7 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
     db = FileDB()
     
     # Database dan barcha fayllarni olish va mavjud fayllar bilan match qilish
-    all_files = db.get_all_files(CONFIG["name"])
+    all_files = db.get_files(CONFIG["name"])
     
     # Mavjud fayllarni database bilan match qilish
     matched_files = []
