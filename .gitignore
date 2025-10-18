@@ -96,6 +96,16 @@ Thumbs.db
 **/*.bmp
 **/*.svg
 
+# Downloads va cache papkalari - muhim fayllar
+downloads/
+downloads/*
+results/
+local_db/
+logs/
+finish/
+telegramuploader/session.session
+*.session
+
 # Node.js va npm fayllari (agar kerak bo‘lsa)
 **/node_modules/
 **/npm-debug.log*
