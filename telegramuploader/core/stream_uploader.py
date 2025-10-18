@@ -197,8 +197,8 @@ class StreamingUploader:
                     entity,
                     str(temp_file),
                     caption=caption,
-                    parse_mode="html",
-                        supports_streaming=True,
+                    parse_mode=None,  # ✅ HTML parsing ni o'chiramiz
+                    supports_streaming=True,
                         progress_callback=progress,
                     )
 

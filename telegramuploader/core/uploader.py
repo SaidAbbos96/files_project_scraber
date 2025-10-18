@@ -366,7 +366,7 @@ class TelegramUploader:
                     entity,
                     output_path,
                     caption=caption,
-                    parse_mode="html",
+                    parse_mode=None,  # ✅ HTML parsing ni o'chiramiz - oddiy matn
                     supports_streaming=True,  # 🔑 video sifatida yuboriladi
                     progress_callback=progress,
                     attributes=attributes,  # 🎬 Video attributes qo'shish

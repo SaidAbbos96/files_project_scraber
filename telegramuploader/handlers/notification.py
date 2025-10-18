@@ -92,7 +92,7 @@ class NotificationHandler:
                     entity = await client.get_entity(target_group)
 
                     # Xabar yuborish
-                    await client.send_message(entity, message, parse_mode="HTML")
+                    await client.send_message(entity, message, parse_mode=None)  # ✅ HTML parsing o'chirildi
                     return True
 
                 except Exception as e:

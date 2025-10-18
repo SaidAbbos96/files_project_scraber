@@ -1,7 +1,66 @@
 import json
 import re
+import html
 
 from core.catigories import CATEGORY_MAP, CATEGORY_NAME_TO_ID, STANDARD_CATEGORIES
+
+
+def clean_html_for_telegram(text: str) -> str:
+    """
+    HTML ni Telegram uchun xavfsiz formatga aylantirish
+    
+    Args:
+        text: HTML yoki oddiy matn
+        
+    Returns:
+        Telegram uchun xavfsiz matn
+    """
+    if not text:
+        return ""
+    
+    # HTML entities decode qilish
+    text = html.unescape(text)
+    
+    # Qo'llab-quvvatlanmaydigan HTML teglarni olib tashlash
+    # Telegram faqat <b>, <i>, <u>, <s>, <a>, <code>, <pre> teglarini qo'llab-quvvatlaydi
+    
+    # Barcha HTML teglarni olib tashlash (xavfsiz variant)
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Ortiqcha bo'shliqlarni tozalash
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # ✅ HTML entities dan keyin tozalash - faqat oddiy matn qoldirish
+    # Maxsus belgilarni oddiy belgilarga aylantirish (escape qilmaslik)
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+    
+    return text
+
+
+def sanitize_caption_data(data: dict) -> dict:
+    """
+    Caption data ni Telegram uchun xavfsiz qilish
+    
+    Args:
+        data: Caption ma'lumotlari
+        
+    Returns:
+        Tozalangan data
+    """
+    sanitized = {}
+    
+    for key, value in data.items():
+        if isinstance(value, str):
+            # String qiymatlarni tozalash
+            sanitized[key] = clean_html_for_telegram(value)
+        elif isinstance(value, list):
+            # List ichidagi stringlarni tozalash
+            sanitized[key] = [clean_html_for_telegram(str(item)) if isinstance(item, str) else item for item in value]
+        else:
+            # Boshqa turlarni o'zgartimasdan qoldirish
+            sanitized[key] = value
+    
+    return sanitized
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -116,7 +175,7 @@ def categories_to_ids(categories: list[str]) -> list[int]:
 
 def make_caption(data: dict) -> str:
     """
-    Dict → caption string
+    Dict → caption string (Telegram uchun xavfsiz)
     Masalan:
     {
         "lang": "uz",
@@ -125,11 +184,22 @@ def make_caption(data: dict) -> str:
         "desc": "Vaqt mashinasi orqali..."
     }
     """
+    # Data ni tozalash
+    clean_data = sanitize_caption_data(data)
+    
     caption = []
-    for key, value in data.items():
+    for key, value in clean_data.items():
         if isinstance(value, list):
             value = ", ".join(map(str, value))
-        caption.append(f"#{key}={value}")
+        elif isinstance(value, (int, float)):
+            value = str(value)
+        elif not isinstance(value, str):
+            value = str(value)
+        
+        # Bo'sh qiymatlarni o'tkazib yuborish
+        if value and str(value).strip():
+            caption.append(f"#{key}={value}")
+    
     return "\n".join(caption)
 
 
