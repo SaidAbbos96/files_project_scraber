@@ -9,7 +9,7 @@ from utils.logger_core import logger
 from scraper import scrape, ScrapingOrchestrator, quick_scrape
 from core.config import APP_CONFIG, BROWSER_CONFIG, DB_PATH
 from core.site_configs import SITE_CONFIGS
-from telegramuploader.legacy_adapter import download_and_upload
+from telegramuploader.legacy_adapter import download_and_upload, upload_only_mode
 from utils.system_diagnostics import SystemDiagnostics
 
 
@@ -162,6 +162,7 @@ async def show_config_menu(CONFIG, site_name):
     logger.info("[1] Scrape - yangi fayllarni topish")
     logger.info("[2] Download - fayllarni yuklash")
     logger.info("[3] Download + Upload - yuklash va Telegramga yuborish")
+    logger.info("[4] Upload Only - faqat Telegramga yuborish")
     logger.info("[stats] Fayllar statistikasi")
     logger.info("[reset] Upload statusini reset qilish")
     logger.info("[clear] Bu config'dagi barcha fayllarni o'chirish")
@@ -175,6 +176,8 @@ async def show_config_menu(CONFIG, site_name):
         await download(CONFIG)
     elif mode == "3":
         await download_and_upload(CONFIG)
+    elif mode == "4":
+        await upload_only_mode(CONFIG)
     elif mode.lower() == "stats":
         await show_files_stats(site_name)
     elif mode.lower() == "reset":

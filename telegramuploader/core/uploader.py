@@ -41,11 +41,12 @@ class TelegramUploader:
             import ffmpeg
 
             # Multiple methods to get video info
-            
+
             # Method 1: Direct subprocess with system tools
             video_info = self._get_video_info_direct(file_path)
             if video_info:
-                logger.info(f"📹 Direct method: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
+                logger.info(
+                    f"📹 Direct method: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
                 return DocumentAttributeVideo(
                     duration=int(video_info['duration']),
                     w=video_info['width'],
@@ -53,11 +54,12 @@ class TelegramUploader:
                     supports_streaming=True,
                     round_message=False
                 )
-            
+
             # Method 2: ffmpeg-python library
             video_info = self._get_video_info_ffmpeg_python(file_path)
             if video_info:
-                logger.info(f"� ffmpeg-python: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
+                logger.info(
+                    f"� ffmpeg-python: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
                 return DocumentAttributeVideo(
                     duration=int(video_info['duration']),
                     w=video_info['width'],
@@ -79,29 +81,31 @@ class TelegramUploader:
         try:
             import subprocess
             import json
-            
+
             # 1. System ffprobe
             for cmd in ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe']:
                 try:
                     result = subprocess.run([
-                        cmd, '-v', 'quiet', '-print_format', 'json', 
+                        cmd, '-v', 'quiet', '-print_format', 'json',
                         '-show_format', '-show_streams', file_path
                     ], capture_output=True, text=True, timeout=10, check=True)
-                    
+
                     data = json.loads(result.stdout)
-                    video_stream = next((s for s in data.get('streams', []) if s.get('codec_type') == 'video'), None)
-                    
+                    video_stream = next((s for s in data.get(
+                        'streams', []) if s.get('codec_type') == 'video'), None)
+
                     if video_stream:
                         width = int(video_stream.get('width', 1280))
                         height = int(video_stream.get('height', 720))
-                        duration = float(data.get('format', {}).get('duration', 0))
+                        duration = float(
+                            data.get('format', {}).get('duration', 0))
                         logger.info(f"✅ Direct ffprobe success: {cmd}")
                         return {'width': width, 'height': height, 'duration': duration}
-                        
+
                 except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired) as e:
                     logger.debug(f"🔄 {cmd} failed: {e}")
                     continue
-                    
+
             return None
         except Exception as e:
             logger.debug(f"Direct method error: {e}")
@@ -111,24 +115,26 @@ class TelegramUploader:
         """ffmpeg-python library bilan video info olish"""
         try:
             import ffmpeg
-            
+
             # Try with different ffmpeg/ffprobe paths
             for ffmpeg_cmd in ['ffprobe', '/usr/bin/ffprobe', 'ffmpeg']:
                 try:
                     probe = ffmpeg.probe(file_path, cmd=ffmpeg_cmd)
-                    video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
-                    
+                    video_stream = next(
+                        (s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+
                     if video_stream:
                         width = int(video_stream.get('width', 1280))
                         height = int(video_stream.get('height', 720))
-                        duration = float(probe.get('format', {}).get('duration', 0))
+                        duration = float(
+                            probe.get('format', {}).get('duration', 0))
                         logger.info(f"✅ ffmpeg-python success: {ffmpeg_cmd}")
                         return {'width': width, 'height': height, 'duration': duration}
-                        
+
                 except Exception as e:
                     logger.debug(f"🔄 ffmpeg-python {ffmpeg_cmd} failed: {e}")
                     continue
-                    
+
             return None
         except Exception as e:
             logger.debug(f"ffmpeg-python method error: {e}")
@@ -139,10 +145,12 @@ class TelegramUploader:
         try:
             file_size = os.path.getsize(file_path)
             # Taxminiy duration = file_size / (1MB/minute) - very rough estimate
-            estimated_duration = max(60, min(7200, file_size // (1024 * 1024)))  # 1min - 2hours
-            
-            logger.info(f"🎬 Smart default: 1280x720, ~{estimated_duration}s (estimated from {file_size/1024/1024:.1f}MB)")
-            
+            estimated_duration = max(
+                60, min(7200, file_size // (1024 * 1024)))  # 1min - 2hours
+
+            logger.info(
+                f"🎬 Smart default: 1280x720, ~{estimated_duration}s (estimated from {file_size/1024/1024:.1f}MB)")
+
             return DocumentAttributeVideo(
                 duration=int(estimated_duration),
                 w=1280,
@@ -157,79 +165,83 @@ class TelegramUploader:
     def validate_video_file(self, file_path: str) -> tuple[bool, str]:
         """
         Video faylni telegramga yuborishdan avval tekshirish
-        
+
         Args:
             file_path: Video fayl path'i
-            
+
         Returns:
             (is_valid, reason) tuple
         """
         if not os.path.exists(file_path):
             return False, "Fayl topilmadi"
-        
+
         file_size = os.path.getsize(file_path)
         if file_size == 0:
             return False, "Fayl bo'sh"
-        
+
         if file_size < 1024:  # 1KB
             return False, "Fayl juda kichik (1KB dan kam)"
-        
+
         # Video format tekshirish
         file_ext = Path(file_path).suffix.lower()
         if file_ext not in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']:
             logger.warning(f"⚠️ Noma'lum video format: {file_ext}")
-        
+
         # FFprobe bilan video stream tekshirish
         try:
             import subprocess
             import json
-            
+
             for cmd in ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe']:
                 try:
                     result = subprocess.run([
-                        cmd, '-v', 'quiet', '-print_format', 'json', 
+                        cmd, '-v', 'quiet', '-print_format', 'json',
                         '-show_streams', file_path
                     ], capture_output=True, text=True, timeout=15, check=True)
-                    
+
                     data = json.loads(result.stdout)
                     streams = data.get('streams', [])
-                    
+
                     # Video stream mavjudligini tekshirish
-                    video_streams = [s for s in streams if s.get('codec_type') == 'video']
+                    video_streams = [s for s in streams if s.get(
+                        'codec_type') == 'video']
                     if not video_streams:
                         return False, "Video stream topilmadi"
-                    
+
                     video_stream = video_streams[0]
-                    
+
                     # Asosiy parametrlarni tekshirish
                     width = video_stream.get('width')
                     height = video_stream.get('height')
-                    
+
                     if not width or not height:
                         return False, "Video o'lchamlari aniqlanmadi"
-                    
+
                     if width < 64 or height < 64:
                         return False, f"Video juda kichik: {width}x{height}"
-                    
+
                     if width > 4096 or height > 4096:
                         return False, f"Video juda katta: {width}x{height}"
-                    
+
                     # Codec tekshirish
                     codec = video_stream.get('codec_name', 'unknown')
                     if codec in ['prores', 'rawvideo']:
-                        logger.warning(f"⚠️ Telegram uchun optimal emas codec: {codec}")
-                    
+                        logger.warning(
+                            f"⚠️ Telegram uchun optimal emas codec: {codec}")
+
                     # Duration tekshirish
                     duration = float(video_stream.get('duration', 0))
                     if duration > 0:
                         if duration < 1:
                             return False, f"Video juda qisqa: {duration:.1f}s"
                         if duration > 14400:  # 4 hours
-                            logger.warning(f"⚠️ Juda uzun video: {duration/3600:.1f}h")
-                    
-                    logger.info(f"✅ Video validation OK: {width}x{height}, {codec}, {duration:.1f}s")
+                            logger.warning(
+                                f"⚠️ Juda uzun video: {duration/3600:.1f}h")
+
+                    logger.info(
+                        f"✅ Video validation OK: {width}x{height}, {codec}, {duration:.1f}s")
                     return True, f"Video valid: {width}x{height}, {codec}"
-                    
+
                 except subprocess.CalledProcessError as e:
                     logger.debug(f"🔄 ffprobe {cmd} failed: {e}")
                     continue
@@ -239,14 +251,14 @@ class TelegramUploader:
                 except Exception as e:
                     logger.debug(f"🔄 ffprobe {cmd} error: {e}")
                     continue
-            
+
             # FFprobe ishlamasa, basic file validation
             logger.warning("⚠️ FFprobe ishlamadi, basic validation")
             if file_size > 100 * 1024:  # 100KB dan katta bo'lsa OK deb hisoblaymiz
                 return True, "Basic validation: fayl hajmi normal"
             else:
                 return False, "Fayl juda kichik va FFprobe ishlamadi"
-                
+
         except Exception as e:
             logger.error(f"❌ Video validation critical error: {e}")
             # Critical error bo'lsa ham, katta fayllarni o'tkazamiz
@@ -319,7 +331,7 @@ class TelegramUploader:
             if file_ext in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']:
                 logger.info(f"🎬 Video fayl validation: {filename}")
                 is_valid, reason = self.validate_video_file(output_path)
-                
+
                 if not is_valid:
                     duration = time.time() - start_time
                     logger.error(f"❌ Video validation failed: {reason}")
@@ -327,7 +339,8 @@ class TelegramUploader:
                         filename, size, "Invalid video", f"Video validation failed: {reason}", duration)
                     return False
                 else:
-                    logger.info(f"✅ Video validation passed: {reason}")
+                    pass
+                    # logger.info(f"✅ Video validation passed: {reason}")
 
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
@@ -341,8 +354,8 @@ class TelegramUploader:
                     filename, size, "Entity resolution failed", "Failed to get Telegram entity", duration)
                 return False
 
-            logger.info(
-                f"✅ Guruh aniqlandi: {getattr(entity, 'title', str(entity))} !")
+            # logger.info(
+            #     f"✅ Guruh aniqlandi: {getattr(entity, 'title', str(entity))} !")
             logger.info(f"📤 Telegram send_file ishga tushmoqda...")
 
             # 📤 Timeout siz upload - muvaffaqiyatli yuklashni to'xtatmaymiz
@@ -381,7 +394,6 @@ class TelegramUploader:
             diagnostics.log_success(filename, duration)
             return True
 
-
         except Exception as e:
             import traceback
             duration = time.time() - start_time
@@ -415,7 +427,7 @@ class TelegramUploader:
 
     async def _create_caption(self, item: Dict[str, Any], size: int) -> str:
         """Caption yaratish"""
-        logger.info("🔍 Caption yaratish boshlandi")
+        # logger.info("🔍 Caption yaratish boshlandi")
         logo = item.get("image", None)
         # logo ni faqat to'g'ri URL bo'lsa yoki data:image emas va None emas bo'lsa qo'shamiz
         if (
@@ -456,8 +468,8 @@ class TelegramUploader:
 
             caption = make_caption(caption_data)
             caption = caption[:4096]  # Telegram limit
-            logger.info("✅ Caption yaratildi")
-            logger.info(f"📝 Caption uzunligi: {len(caption)} belgi")
+            # logger.info("✅ Caption yaratildi")
+            # logger.info(f"📝 Caption uzunligi: {len(caption)} belgi")
             return caption
         except Exception as caption_error:
             logger.error(f"❌ Caption yaratishda xato: {caption_error}")
@@ -482,7 +494,7 @@ class TelegramUploader:
                 f"💡 Yoki default_group ishlatiladi: {self.default_group}")
             target_group = self.default_group
 
-        logger.info(f"🔍 Guruhni aniqlash: {target_group}")
+        # logger.info(f"🔍 Guruhni aniqlash: {target_group}")
 
         entity = await resolve_group(target_group)
         return entity

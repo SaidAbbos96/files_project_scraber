@@ -16,10 +16,10 @@ from utils.text import clean_title
 class FileDownloader:
     """Professional file downloader with intelligent timeout and retry"""
     
-    def __init__(self, base_timeout: int = 1800, chunk_size: int = 256 * 1024, max_retries: int = 3):
+    def __init__(self, base_timeout: int = None, chunk_size: int = 256 * 1024, max_retries: int = 3):
         """
         Args:
-            base_timeout: Base timeout in seconds (default 30 minutes)
+            base_timeout: Base timeout in seconds (None = unlimited)
             chunk_size: Download chunk size in bytes (default 256KB)
             max_retries: Maximum retry attempts (default 3)
         """
@@ -29,29 +29,17 @@ class FileDownloader:
     
     def calculate_timeout(self, file_size: int) -> int:
         """
-        Fayl hajmiga qarab intelligent timeout hisoblash
+        ⚡ TIMEOUT REMOVED - always returns None for unlimited download time
         
         Args:
             file_size: File size in bytes
             
         Returns:
-            Timeout in seconds
+            None (unlimited timeout)
         """
-        if file_size <= 0:
-            return self.base_timeout
-        
-        # Minimum 5 minutes, maximum 2 hours
-        min_timeout = 300   # 5 minutes
-        max_timeout = 7200  # 2 hours
-        
-        # Assume 100KB/s minimum speed, add 50% buffer
-        calculated_timeout = int((file_size / (100 * 1024)) * 1.5)
-        
-        # Apply bounds
-        timeout = max(min_timeout, min(calculated_timeout, max_timeout))
-        
-        logger.info(f"🕐 Calculated timeout: {timeout}s for {file_size/1024/1024:.1f}MB file")
-        return timeout
+        # ⚡ Always return None - no timeout limits!
+        logger.info(f"⚡ UNLIMITED download time for {file_size/1024/1024:.1f}MB file")
+        return None
 
     async def download_file_with_retry(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore,
                            file_url: str, output_path: str, filename: str) -> Optional[int]:
@@ -67,16 +55,14 @@ class FileDownloader:
                     # Avval HEAD request bilan file size olish
                     file_size = await self.get_file_size(session, file_url)
                     
-                    # Intelligent timeout calculation
-                    timeout_seconds = self.calculate_timeout(file_size)
-                    
-                    # sock_read timeout ham intelligent bo'lishi kerak
-                    sock_read_timeout = min(timeout_seconds // 4, 1800)  # 1/4 yoki max 30 min
+                    # ⚡ TIMEOUT OLIB TASHLANDI - 4 soat ham bo'lsa kutamiz!
+                    # timeout_seconds = self.calculate_timeout(file_size)
+                    # sock_read_timeout = min(timeout_seconds // 4, 1800)
                     
                     timeout = aiohttp.ClientTimeout(
-                        total=timeout_seconds,
-                        connect=60,  # Connection timeout 1 minute
-                        sock_read=sock_read_timeout  # Dynamic socket read timeout
+                        total=None,          # ✅ Total timeout yo'q - cheksiz
+                        connect=60,          # Connection timeout 1 minute (tez)
+                        sock_read=None       # ✅ Socket read timeout yo'q - cheksiz
                     )
                     
                     size_mb = file_size / (1024 * 1024) if file_size else 0
@@ -85,7 +71,7 @@ class FileDownloader:
                         logger.info(f"🔄 Retry {attempt + 1}/{self.max_retries}: {filename}")
                     
                     logger.info(f"⬇️ Downloading: {filename} ({size_mb:.2f} MB)")
-                    logger.info(f"⏱️ Timeouts: Total={timeout_seconds}s, SockRead={sock_read_timeout}s")
+                    logger.info(f"⚡ Timeout REMOVED - unlimited download time!")
                     
                     async with session.get(file_url, timeout=timeout) as resp:
                         if resp.status != 200:
@@ -120,21 +106,6 @@ class FileDownloader:
                         logger.info(f"✅ Downloaded: {filename} ({actual_size / (1024*1024):.2f} MB)")
                         return actual_size
                         
-                except asyncio.TimeoutError:
-                    logger.error(f"⏰ Download timeout (attempt {attempt + 1}): {filename}")
-                    if attempt == self.max_retries - 1:
-                        logger.error(f"❌ Final timeout after {self.max_retries} attempts: {filename}")
-                        return None
-                    
-                    # Cleanup partial file
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
-                    
-                    # Exponential backoff
-                    wait_time = 2 ** attempt
-                    logger.info(f"⏳ Waiting {wait_time}s before retry...")
-                    await asyncio.sleep(wait_time)
-                    
                 except Exception as e:
                     logger.error(f"❌ Download error (attempt {attempt + 1}): {filename} | {e}")
                     if attempt == self.max_retries - 1:

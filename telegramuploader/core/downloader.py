@@ -14,10 +14,10 @@ from utils.logger_core import logger
 class FileDownloader:
     """Fayllarni yuklab olish uchun class"""
 
-    def __init__(self, base_timeout: int = 7200, max_retries: int = 3):
+    def __init__(self, base_timeout: int = None, max_retries: int = 3):
         """
         Args:
-            base_timeout: Base timeout in seconds (default: 2 hours)
+            base_timeout: Base timeout in seconds (None = unlimited)
             max_retries: Maximum retry attempts (default: 3)
         """
         self.base_timeout = base_timeout
@@ -70,46 +70,39 @@ class FileDownloader:
                 async with session.head(file_url) as head_resp:
                     file_size = int(head_resp.headers.get("Content-Length", 0))
                 
-                # Intelligent timeout hisoblash
-                timeout_seconds = self.calculate_timeout(file_size)
+                # ⚡ TIMEOUT OLIB TASHLANDI - muvaffaqiyatli yuklab olishni to'xtatmaymiz
+                # timeout_seconds = self.calculate_timeout(file_size)
                 
-                # ⏰ Intelligent timeout qo'shamiz
-                async with asyncio.timeout(timeout_seconds):
-                    async with session.get(file_url) as resp:
-                        if resp.status != 200:
-                            logger.error(f"❌ Yuklab bo'lmadi: {file_url}")
-                            return None
-
-                        total = int(resp.headers.get("Content-Length", file_size or 0))
-
-                        # Real download boshlanganda log
-                        # size_gb = total / (1024 ** 3) if total else 0
-                        # logger.info(
-                        #     f"🚀 Download boshlandi: {filename} ({size_gb:.2f} GB)")
-
-                        with open(output_path, "wb") as f, tqdm(
-                            total=total, unit="B", unit_scale=True, desc=f"⬇️ {filename}"
-                        ) as bar:
-                            async for chunk in resp.content.iter_chunked(1024 * 256):
-                                f.write(chunk)
-                                bar.update(len(chunk))
-                            f.flush()
-                            os.fsync(f.fileno())  # 🔑 diskka to'liq yozilsin
-
-                    # Tekshiramiz: to'liq yuklandi (agar Content-Length bor bo'lsa)
-                    if total and os.path.getsize(output_path) != total:
-                        logger.error(f"❌ Fayl to'liq yuklanmadi: {filename}")
-                        os.remove(output_path)
+                # ✅ Timeout siz download - 4 soat ham bo'lsa kutamiz
+                async with session.get(file_url) as resp:
+                    if resp.status != 200:
+                        logger.error(f"❌ Yuklab bo'lmadi: {file_url}")
                         return None
 
-                    return os.path.getsize(output_path)
+                    total = int(resp.headers.get("Content-Length", file_size or 0))
 
-            except asyncio.TimeoutError:
-                logger.error(
-                    f"⏰ Timeout: {filename} yuklab olish {timeout_seconds//60} daqiqadan oshdi")
-                if os.path.exists(output_path):
+                    # Real download boshlanganda log
+                    # size_gb = total / (1024 ** 3) if total else 0
+                    # logger.info(
+                    #     f"🚀 Download boshlandi: {filename} ({size_gb:.2f} GB)")
+
+                    with open(output_path, "wb") as f, tqdm(
+                        total=total, unit="B", unit_scale=True, desc=f"⬇️ {filename}"
+                    ) as bar:
+                        async for chunk in resp.content.iter_chunked(1024 * 256):
+                            f.write(chunk)
+                            bar.update(len(chunk))
+                        f.flush()
+                        os.fsync(f.fileno())  # 🔑 diskka to'liq yozilsin
+
+                # Tekshiramiz: to'liq yuklandi (agar Content-Length bor bo'lsa)
+                if total and os.path.getsize(output_path) != total:
+                    logger.error(f"❌ Fayl to'liq yuklanmadi: {filename}")
                     os.remove(output_path)
-                return None
+                    return None
+
+                return os.path.getsize(output_path)
+
             except Exception as e:
                 logger.error(f"❌ Yuklab olishda xato: {e}")
                 if os.path.exists(output_path):

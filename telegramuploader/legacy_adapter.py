@@ -219,5 +219,130 @@ async def streaming_mode(items: List[Dict[str, Any]], session: aiohttp.ClientSes
     await orchestrator.process_files_streaming(items, session, sem, db)
 
 
+async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
+    """
+    Upload Only mode - faqat downloads papkasidagi fayllarni Telegramga yuklash
+    
+    Args:
+        CONFIG: Konfiguratsiya dictionary
+    """
+    logger.info("📤 Upload Only bosqichi ishga tushmoqda...")
+    
+    from pathlib import Path
+    from utils.files import safe_filename
+    
+    downloads_dir = Path(CONFIG["download_dir"])
+    if not downloads_dir.exists():
+        logger.warning(f"❌ Downloads papkasi topilmadi: {downloads_dir}")
+        return
+    
+    # Downloads papkasidagi barcha video fayllar
+    video_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm']
+    existing_files = []
+    for ext in video_extensions:
+        existing_files.extend(downloads_dir.glob(f"*{ext}"))
+    
+    if not existing_files:
+        logger.info("📁 Downloads papkasida video fayllar topilmadi")
+        return
+    
+    logger.info(f"📁 {len(existing_files)} ta video fayl topildi downloads papkasida")
+    
+    db = FileDB()
+    
+    # Database dan barcha fayllarni olish va mavjud fayllar bilan match qilish
+    all_files = db.get_all_files(CONFIG["name"])
+    
+    # Mavjud fayllarni database bilan match qilish
+    matched_files = []
+    for local_file in existing_files:
+        local_filename = local_file.name
+        # Safe filename hosil qilish
+        for db_file in all_files:
+            expected_filename = safe_filename(db_file.get("name", "unknown"))
+            if local_filename == expected_filename or local_filename.startswith(expected_filename):
+                # Fayl database da bor va hali telegram ga yuklanmagan
+                if not db_file.get("telegram_uploaded", False):
+                    matched_files.append({
+                        "local_path": str(local_file),
+                        "db_file": db_file,
+                        "file_size": local_file.stat().st_size
+                    })
+                    break
+    
+    if not matched_files:
+        logger.info("📤 Telegramga yuklanishi kerak bo'lgan fayllar topilmadi")
+        return
+    
+    logger.info(f"📤 {len(matched_files)} ta fayl Telegramga yuklanadi")
+    
+    # Fayllarni hajm bo'yicha tartiblash (kichikdan kattaga)
+    sort_by_size = CONFIG.get("sort_by_size", False)
+    if sort_by_size:
+        matched_files = sorted(matched_files, key=lambda x: x["file_size"])
+        logger.info("📊 Fayllar hajm bo'yicha tartiblandi (kichikdan kattaga)")
+    
+    # Telegram client'ni ishga tushirish
+    async with Telegram_client:
+        await send_startup_messages(client=Telegram_client)
+        
+        # Orchestrator yaratish
+        orchestrator = TelegramUploaderOrchestrator(CONFIG)
+        
+        # Har bir faylni yuklash
+        uploaded_count = 0
+        failed_count = 0
+        
+        for file_info in matched_files:
+            local_path = file_info["local_path"]
+            db_file = file_info["db_file"]
+            
+            try:
+                logger.info(f"📤 Yuklanmoqda: {Path(local_path).name}")
+                
+                # Upload qilish
+                # File data ni uploader uchun tayyorlash
+                upload_item = db_file.copy()
+                upload_item["local_path"] = local_path
+                
+                success = await orchestrator.uploader.upload_file(
+                    item=upload_item,
+                    config=CONFIG
+                )
+                
+                if success:
+                    # Database'da telegram_uploaded = True qilish
+                    db.update_file_status(
+                        file_url=db_file["file_url"],
+                        telegram_uploaded=True
+                    )
+                    uploaded_count += 1
+                    logger.info(f"✅ Yuklandi: {Path(local_path).name}")
+                    
+                    # Clear uploaded files agar enabled bo'lsa
+                    if CONFIG.get("clear_uploaded_files", False):
+                        try:
+                            os.remove(local_path)
+                            logger.info(f"🗑️ O'chirildi: {Path(local_path).name}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Faylni o'chirishda xato: {e}")
+                else:
+                    failed_count += 1
+                    logger.error(f"❌ Yuklanmadi: {Path(local_path).name}")
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"❌ Xato {Path(local_path).name}: {e}")
+    
+    # Yakuniy hisobot
+    logger.info(f"\n✅ Upload Only jarayoni tugadi!")
+    logger.info(f"📊 Jami: {len(matched_files)} ta fayl")
+    logger.info(f"✅ Yuklandi: {uploaded_count} ta fayl")
+    logger.info(f"❌ Xato: {failed_count} ta fayl")
+    
+    if uploaded_count > 0:
+        logger.info(f"🎉 {uploaded_count} ta fayl muvaffaqiyatli Telegramga yuklandi!")
+
+
 # Legacy function aliases
 select_debug_files_legacy = select_debug_files

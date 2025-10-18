@@ -32,7 +32,7 @@ class FileDownloaderOrchestrator:
         
         # Initialize components with enhanced timeout and retry
         self.downloader = FileDownloader(
-            base_timeout=config.get("download_base_timeout", 1800),  # 30 minutes base
+            base_timeout=None,  # ⚡ Timeout removed - unlimited download time
             chunk_size=config.get("download_chunk_size", 256 * 1024),  # 256KB
             max_retries=config.get("download_max_retries", 3)  # 3 retries
         )

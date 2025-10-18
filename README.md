@@ -35,7 +35,7 @@
 |-----------|------------|-----------------|
 | 🕷️ **Scraper** | Web scraping va data collection | Playwright + AsyncIO |
 | ⬇️ **FileDownloader** | Parallel/Sequential file downloading | aiohttp + disk monitoring |
-| ⬆️ **TelegramUploader** | Classic/Streaming upload with video optimization | Telethon + FFmpeg + diagnostics |
+| ⬆️ **TelegramUploader** | Classic/Streaming/Upload-Only modes with video optimization | Telethon + FFmpeg + diagnostics |
 | 💾 **Core** | Database, config va shared utilities | SQLite + environment management |
 | 🛠️ **Utils** | Logger, disk monitor, system diagnostics | Cross-cutting concerns |
 
@@ -76,7 +76,9 @@ python main.py
 [1] Scrape - yangi fayllarni topish
 [2] Download - fayllarni yuklash
 [3] Download + Upload - yuklash va Telegramga yuborish
+[4] Upload Only - faqat Telegramga yuborish
 [stats] Fayllar statistikasi
+[reset] Upload statusini reset qilish
 [clear] Bu config'dagi barcha fayllarni o'chirish
 [back] Bosh menyuga qaytish
 ```
@@ -162,6 +164,7 @@ python main.py
 |-------------|-----------------|-----------------|
 | 📤 **Classic upload** | Disk → Telegram | Professional metadata |
 | 🌊 **Streaming upload** | Direct upload (no disk) | `use_streaming_upload: true` |
+| ⚡ **Upload Only mode** | Process existing files only | Database matching + validation |
 | 🎬 **Video optimization** | FFmpeg metadata extraction | DocumentAttributeVideo support |
 | � **Video attributes** | Width, height, duration detection | Prevents black screen issues |
 | �🔀 **Parallel upload** | 2 concurrent uploads | `upload_concurrency: 2` |
@@ -410,7 +413,9 @@ python main.py
 [1] Scrape - yangi fayllarni topish
 [2] Download - fayllarni yuklash  
 [3] Download + Upload - yuklash va Telegramga yuborish
+[4] Upload Only - faqat Telegramga yuborish
 [stats] Fayllar statistikasi
+[reset] Upload statusini reset qilish
 [clear] Bu config'dagi barcha fayllarni o'chirish
 [back] Bosh menyuga qaytish
 ```
@@ -465,6 +470,18 @@ Status: success
 ✅ Diagnostic reporting
 ✅ Auto file cleanup
 ✅ Real-time status updates
+\`\`\`
+
+#### 📤 [4] Upload Only Mode
+\`\`\`bash
+# Upload existing files from downloads folder
+✅ Process downloaded files only
+✅ Database validation & matching
+✅ Multiple video format support
+✅ Size-based file prioritization
+✅ Auto cleanup after upload
+✅ Comprehensive progress reporting
+✅ Batch upload completion stats
 \`\`\`
 
 ---
@@ -880,7 +897,8 @@ Real-time disk joy monitoring:
 | **Mavzu** | **Fayl** | **Maqsad** |
 |-----------|----------|------------|
 | 🌊 **Streaming Upload** | [\`info/STREAMING_GUIDE.md\`](info/STREAMING_GUIDE.md) | Disk tejamkor upload |
-| 📱 **Sequential Mode** | [\`info/SEQUENTIAL_MODE.md\`](info/SEQUENTIAL_MODE.md) | Bitta-bitta processing |
+| � **Upload Only Mode** | [\`info/UPLOAD_ONLY_GUIDE.md\`](info/UPLOAD_ONLY_GUIDE.md) | Mavjud fayllarni yuklash |
+| �📱 **Sequential Mode** | [\`info/SEQUENTIAL_MODE.md\`](info/SEQUENTIAL_MODE.md) | Bitta-bitta processing |
 | 🚀 **Scraping Success** | [\`info/SCRAPING_MODULE_SUCCESS.md\`](info/SCRAPING_MODULE_SUCCESS.md) | Scraping best practices |
 | 📊 **Diagnostics** | [\`info/test_diagnostics.json\`](info/test_diagnostics.json) | System diagnostics |
 | 🔧 **Rate Limiting** | [\`info/RATE_LIMITING_SOLUTION.md\`](info/RATE_LIMITING_SOLUTION.md) | Performance tuning |
