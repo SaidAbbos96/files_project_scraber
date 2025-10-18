@@ -25,23 +25,17 @@ class FileDownloader:
 
     def calculate_timeout(self, file_size: int) -> int:
         """
-        Fayl hajmiga qarab intelligent timeout hisoblash
+        ⚡ TIMEOUT REMOVED - always returns None for unlimited download time
         
         Args:
             file_size: File size in bytes
             
         Returns:
-            Timeout in seconds
+            None (unlimited timeout)
         """
-        if file_size <= 0:
-            return self.base_timeout
-        
-        # Minimum 10 minutes, maximum 4 hours (telegram upload uchun uzunroq)
-        min_timeout = 600   # 10 minutes
-        max_timeout = 14400  # 4 hours
-        
-        # Assume 50KB/s minimum speed for telegram, add 50% buffer
-        calculated_timeout = int((file_size / (50 * 1024)) * 1.5)
+        # ⚡ Always return None - 4 soat ham bo'lsa kutamiz!
+        logger.info(f"⚡ UNLIMITED download time for {file_size/1024/1024:.1f}MB file")
+        return None
         
         # Apply bounds
         timeout = max(min_timeout, min(calculated_timeout, max_timeout))
