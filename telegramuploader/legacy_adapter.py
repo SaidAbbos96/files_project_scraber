@@ -20,6 +20,79 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 
+async def check_and_queue_existing_files(db: FileDB, config: Dict[str, Any]) -> None:
+    """
+    Downloads papkasidagi mavjud fayllarni tekshirish va upload queue ga qo'yish
+    """
+    from pathlib import Path
+    from utils.files import safe_filename
+    
+    downloads_dir = Path(config["download_dir"])
+    if not downloads_dir.exists():
+        return
+    
+    logger.info("📁 Downloads papkasidagi mavjud fayllarni tekshirish...")
+    
+    # Downloads papkasidagi barcha fayllar
+    existing_files = list(downloads_dir.glob("*.mp4"))
+    if not existing_files:
+        logger.info("📁 Downloads papkasida fayllar topilmadi")
+        return
+    
+    logger.info(f"📁 {len(existing_files)} ta fayl topildi downloads papkasida")
+    
+    # Database dan barcha yuklanmagan fayllarni olish
+    all_undownloaded = db.get_undownloaded_files(config["name"])
+    
+    # Mavjud fayllarni database bilan match qilish
+    matched_files = []
+    for local_file in existing_files:
+        local_filename = local_file.name
+        
+        # Database dan mos faylni topish
+        for db_file in all_undownloaded:
+            expected_filename = safe_filename(db_file["title"]) + f"_{db_file['id']}.mp4"
+            
+            if expected_filename == local_filename:
+                # File hajmini tekshirish
+                local_size = local_file.stat().st_size
+                server_size = db_file.get("file_size", 0)
+                
+                if server_size and local_size > 0:
+                    size_diff_mb = abs(server_size - local_size) / (1024 ** 2)
+                    
+                    if size_diff_mb > 100:  # 100MB dan katta farq
+                        logger.warning(f"⚠️ Hajm farqi: {local_filename}")
+                        logger.warning(f"   Local: {local_size / (1024**3):.2f}GB, Server: {server_size / (1024**3):.2f}GB")
+                        
+                        # Noto'g'ri faylni o'chirish va database status reset
+                        try:
+                            local_file.unlink()
+                            logger.info(f"🗑️ Noto'g'ri fayl o'chirildi: {local_filename}")
+                            
+                            # Database da local_path ni reset qilish
+                            db.update_file(db_file["id"], local_path=None)
+                            logger.info(f"🔄 Database status reset qilindi: {db_file['id']}")
+                            
+                        except Exception as e:
+                            logger.error(f"❌ Faylni o'chirishda xato: {e}")
+                    else:
+                        # Fayl to'g'ri - database update qilish va upload queue ga qo'yish
+                        db.update_file(
+                            db_file["id"], 
+                            local_path=str(local_file),
+                            file_size=local_size
+                        )
+                        matched_files.append((local_file, db_file))
+                        logger.info(f"✅ To'g'ri fayl topildi: {local_filename}")
+                break
+    
+    if matched_files:
+        logger.info(f"📤 {len(matched_files)} ta fayl upload qilish uchun tayyorlandi")
+    else:
+        logger.info("📤 Upload qilish uchun tayyor fayllar yo'q")
+
+
 async def download_and_upload(CONFIG: Dict[str, Any]) -> None:
     """
     Legacy download_and_upload function - yangi sistemani ishlatadi
@@ -40,21 +113,27 @@ async def download_and_upload(CONFIG: Dict[str, Any]) -> None:
 
     db = FileDB()
 
-    # Config'da sort_by_size parametrini tekshirish
-    sort_by_size = 1 if CONFIG.get("sort_by_size", False) else 0
-    items = db.get_files(CONFIG["name"], sort_by_size=sort_by_size)
+    # ✅ Faqat yuklanmagan fayllarni olish
+    items = db.get_undownloaded_files(CONFIG["name"])
 
+    # Config'da sort_by_size parametrini tekshirish
+    sort_by_size = CONFIG.get("sort_by_size", False)
     if sort_by_size:
-        logger.info(f"📊 Fayllar eng kichik hajmdan boshlab tartiblanadi")
+        logger.info(f"📊 Yuklanmagan fayllar eng kichik hajmdan boshlab tartiblanadi")
+        # Yuklanmagan fayllarni hajm bo'yicha tartiblash
+        items = sorted(items, key=lambda x: x.get('file_size', 0) or 0)
     else:
-        logger.info(f"📊 Fayllar standart tartibda qayta ishlanadi")
+        logger.info(f"📊 Yuklanmagan fayllar standart tartibda qayta ishlanadi")
 
     # print("items", items)
     if not items:
         logger.warning(f"❌ {CONFIG['name']} uchun DB da fayl yo'q.")
         return
     else:
-        logger.info(f"📊 {len(items)} ta fayl topildi {CONFIG['name']} uchun.")
+        logger.info(f"📊 {len(items)} ta yuklanmagan fayl topildi {CONFIG['name']} uchun.")
+
+    # ✅ Local downloads papkasidagi mavjud fayllarni tekshirish
+    await check_and_queue_existing_files(db, CONFIG)
 
     # --- DEBUG: Eng kichik 10 faylni ko'rsatish va tanlash ---
     if CONFIG.get("debug", False):

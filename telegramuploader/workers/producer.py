@@ -75,17 +75,6 @@ class FileProducer:
 
     async def _validate_file_info(self, file_info: Dict[str, Any]) -> bool:
         """Fayl ma'lumotlarini validatsiya qilish"""
-        # Upload qilingan faylni tashlab ketish
-        if file_info["uploaded"]:
-            logger.info(
-                f"⏭️ Fayl avval upload qilingan, o'tkazib yuborildi: {file_info['title']}")
-            if not self._quiet_mode:
-                await self.notifier.send_already_uploaded(file_info["title"], file_info["id"])
-            if self.orchestrator:
-                # filename ni keyinroq olish kerak, hozircha title ishlatamiz
-                await self.orchestrator.update_progress(True, True, file_info["title"])
-            return False
-
         # URL validatsiyasi
         if not file_info["file_url"] or "https://t.me/" in file_info["file_url"]:
             logger.warning(f"❌ file_url yo'q: {file_info['title']}")
@@ -135,7 +124,7 @@ class FileProducer:
             return None, True
 
     async def _handle_invalid_file(self, file_path: str, reason: str, file_info: Dict[str, Any], url_size: int):
-        """Noto'g'ri faylni qayta ishlash - disk space ni hisobga olgan holda"""
+        """Noto'g'ri faylni qayta ishlash - boshida o'chirib, database reset"""
         filename = os.path.basename(file_path)
         local_gb = os.path.getsize(file_path) / (1024 ** 3)
         size_gb = url_size / (1024 ** 3) if url_size else 0
@@ -143,38 +132,21 @@ class FileProducer:
         logger.warning(f"⚠️ {reason}: {filename}")
         logger.warning(f"   Local: {local_gb:.2f}GB, Server: {size_gb:.2f}GB")
         
-        # Disk space tekshiruvi
-        disk_monitor = get_disk_monitor()
-        if disk_monitor and not disk_monitor.has_enough_space(url_size):
-            # Disk space kam - invalid faylni saqlab qo'yamiz va upload qilamiz
-            logger.info(
-                f"💾 [{file_info['id']}] Disk space kam - invalid fayl upload qilinadi: {filename}")
-            logger.info(
-                f"⚠️ Keyingi restart da qayta download qilinadi")
-            
-            await self.notifier.send_message(
-                f"⚠️ PARTIAL FILE UPLOAD:\n"
-                f"📄 {file_info['title']}\n"
-                f"💾 Local: {local_gb:.2f}GB / Server: {size_gb:.2f}GB\n"
-                f"🔄 Upload qilinadi, keyingi restart da to'liq yuklanadi"
-            )
-            return  # Faylni o'chirmaymiz, upload qilamiz
-        
-        # Disk space yetarli - qayta download qilamiz
-        logger.info(
-            f"🔄 [{file_info['id']}] Fayl tekshirildi - noto'g'ri, o'chiriladi va qayta yuklanadi")
-
-        await self.notifier.send_file_redownload(
-            file_info["title"], file_info["id"], filename, reason, local_gb, size_gb
-        )
+        # ❌ Bu logic artiq check_and_queue_existing_files da bor
+        # Shuning uchun buni soddalashtiramiz
+        logger.info(f"� [{file_info['id']}] Invalid fayl o'chiriladi, database reset")
 
         # Noto'g'ri faylni o'chirish
         try:
             os.remove(file_path)
-            logger.info(
-                f"🗑️ [{file_info['id']}] Noto'g'ri fayl o'chirildi: {filename}")
+            logger.info(f"�️ [{file_info['id']}] Invalid fayl o'chirildi: {filename}")
         except Exception as e:
             logger.error(f"❌ [{file_info['id']}] Faylni o'chirishda xato: {e}")
+        
+        # Database da local_path ni reset qilish (yangi download uchun)
+        from core.FileDB import FileDB
+        db = FileDB()
+        db.update_file(file_info['id'], local_path=None)
 
     async def _download_file(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore,
                              file_info: Dict[str, Any], file_path: str, url_size: int,
