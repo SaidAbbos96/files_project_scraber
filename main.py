@@ -97,9 +97,49 @@ async def clear_downloads_cache():
 
 
 async def fix_telegram_session_lock():
-    """Telegram session database lock muammosini hal qilish"""
+    """Telegram session database lock muammosini hal qilish (xavfsiz)"""
     try:
         logger.info("🔧 Telegram session lock muammosini hal qilish...")
+        logger.info("⚠️ Faqat files_project_scraber loyihasi processlarini tekshiradi")
+        
+        current_dir = os.getcwd()
+        logger.info(f"📁 Joriy papka: {current_dir}")
+
+        # 1. Faqat bizning loyiha processlarini topish
+        try:
+            import subprocess
+            result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)
+            
+            lines = result.stdout.split('\n')
+            our_processes = []
+            
+            for line in lines:
+                if current_dir in line and 'python' in line and 'main' in line and 'grep' not in line:
+                    our_processes.append(line)
+            
+            if our_processes:
+                logger.info("📤 Bizning loyiha processlar topildi:")
+                for proc in our_processes:
+                    logger.info(f"   {proc}")
+                
+                confirm = safe_input("⚠️ Ushbu processlarni o'chirishni xohlaysizmi? (y/n): ")
+                if confirm.lower() in ['y', 'yes', 'ha']:
+                    for proc_line in our_processes:
+                        try:
+                            pid = proc_line.split()[1]
+                            subprocess.run(["kill", "-TERM", pid], check=False)
+                            logger.info(f"📤 Process {pid} to'xtatildi")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Process {pid} ni to'xtatishda xato: {e}")
+                else:
+                    logger.info("❌ Process to'xtatish bekor qilindi")
+            else:
+                logger.info("ℹ️ Bizning Python main.py process ishlamayapti")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Process qidirishda xato: {e}")
+        
+        await asyncio.sleep(2)  # 2 soniya kutish
 
         # Session fayl path
         session_files = [
@@ -108,16 +148,7 @@ async def fix_telegram_session_lock():
             "telegramuploader/session.session-wal",
             "telegramuploader/session.session-shm"
         ]
-
-        # 1. Telegram processlarini to'xtatish
-        try:
-            import subprocess
-            subprocess.run(["pkill", "-f", "python.*main.py"], check=False)
-            subprocess.run(["pkill", "-f", "telegram"], check=False)
-            await asyncio.sleep(2)  # 2 soniya kutish
-        except Exception:
-            pass
-
+        
         # 2. Session fayllarini backup va o'chirish
         session_backup_dir = Path("session_backup")
         session_backup_dir.mkdir(exist_ok=True)

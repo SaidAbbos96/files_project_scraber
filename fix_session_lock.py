@@ -11,31 +11,53 @@ import shutil
 from pathlib import Path
 
 def kill_telegram_processes():
-    """Telegram bilan bog'liq processlarni to'xtatish"""
+    """Faqat joriy loyiha Telegram processlarini to'xtatish"""
     try:
-        print("🔄 Telegram processlarni to'xtatish...")
+        print("🔄 Faqat files_project_scraber processlarni to'xtatish...")
         
-        # Python main.py processlarni topish va to'xtatish
-        result = subprocess.run(
-            ["pgrep", "-f", "python.*main.py"], 
-            capture_output=True, text=True, check=False
-        )
+        # Joriy papka path
+        current_dir = os.getcwd()
+        print(f"📁 Joriy papka: {current_dir}")
         
-        if result.stdout.strip():
-            pids = result.stdout.strip().split('\n')
-            for pid in pids:
-                try:
-                    subprocess.run(["kill", "-TERM", pid], check=False)
-                    print(f"📤 Process {pid} to'xtatildi")
-                except Exception as e:
-                    print(f"⚠️ Process {pid} ni to'xtatishda xato: {e}")
-        
-        # Telegram processlarni ham to'xtatish
-        subprocess.run(["pkill", "-f", "telegram"], check=False)
+        # Faqat joriy papkadagi python main.py processlarni topish
+        try:
+            result = subprocess.run(
+                ["ps", "aux"], 
+                capture_output=True, text=True, check=True
+            )
+            
+            lines = result.stdout.split('\n')
+            our_processes = []
+            
+            for line in lines:
+                if current_dir in line and 'python' in line and 'main' in line and 'grep' not in line:
+                    our_processes.append(line)
+            
+            if our_processes:
+                print("📤 Bizning loyiha processlar topildi:")
+                for proc in our_processes:
+                    print(f"   {proc}")
+                
+                confirm = input("\n⚠️ Ushbu processlarni o'chirishni xohlaysizmi? (y/n): ").strip().lower()
+                if confirm in ['y', 'yes', 'ha']:
+                    for proc_line in our_processes:
+                        try:
+                            pid = proc_line.split()[1]
+                            subprocess.run(["kill", "-TERM", pid], check=False)
+                            print(f"📤 Process {pid} to'xtatildi")
+                        except Exception as e:
+                            print(f"⚠️ Process {pid} ni to'xtatishda xato: {e}")
+                else:
+                    print("❌ Process to'xtatish bekor qilindi")
+            else:
+                print("ℹ️ Bizning Python main.py process ishlamayapti")
+                
+        except Exception as e:
+            print(f"⚠️ Process qidirishda xato: {e}")
         
         # 3 soniya kutish
         time.sleep(3)
-        print("✅ Processlar to'xtatildi")
+        print("✅ Process tekshiruvi tugadi")
         
     except Exception as e:
         print(f"⚠️ Process to'xtatishda xato: {e}")
