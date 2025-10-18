@@ -135,13 +135,32 @@ class FileProducer:
             return None, True
 
     async def _handle_invalid_file(self, file_path: str, reason: str, file_info: Dict[str, Any], url_size: int):
-        """Noto'g'ri faylni qayta ishlash"""
+        """Noto'g'ri faylni qayta ishlash - disk space ni hisobga olgan holda"""
         filename = os.path.basename(file_path)
         local_gb = os.path.getsize(file_path) / (1024 ** 3)
         size_gb = url_size / (1024 ** 3) if url_size else 0
 
-        logger.warning(f"⚠️ {reason}: {filename}. Qayta yuklanadi.")
+        logger.warning(f"⚠️ {reason}: {filename}")
         logger.warning(f"   Local: {local_gb:.2f}GB, Server: {size_gb:.2f}GB")
+        
+        # Disk space tekshiruvi
+        disk_monitor = get_disk_monitor()
+        if disk_monitor and not disk_monitor.has_enough_space(url_size):
+            # Disk space kam - invalid faylni saqlab qo'yamiz va upload qilamiz
+            logger.info(
+                f"💾 [{file_info['id']}] Disk space kam - invalid fayl upload qilinadi: {filename}")
+            logger.info(
+                f"⚠️ Keyingi restart da qayta download qilinadi")
+            
+            await self.notifier.send_message(
+                f"⚠️ PARTIAL FILE UPLOAD:\n"
+                f"📄 {file_info['title']}\n"
+                f"💾 Local: {local_gb:.2f}GB / Server: {size_gb:.2f}GB\n"
+                f"🔄 Upload qilinadi, keyingi restart da to'liq yuklanadi"
+            )
+            return  # Faylni o'chirmaymiz, upload qilamiz
+        
+        # Disk space yetarli - qayta download qilamiz
         logger.info(
             f"🔄 [{file_info['id']}] Fayl tekshirildi - noto'g'ri, o'chiriladi va qayta yuklanadi")
 
