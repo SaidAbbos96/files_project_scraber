@@ -37,6 +37,7 @@ async def main():
     logger.info("[info] System Diagnostics")
     logger.info("[clear-cache] Downloads papkasini tozalash")
     logger.info("[clear-db] Database faylini tozalash")
+    logger.info("[fix-session] Telegram session lock muammosini hal qilish")
 
     choice = safe_input("\nTanlang (raqam yoki komanda) → ")
 
@@ -69,6 +70,11 @@ async def main():
         await clear_database_file()
         return
 
+    elif choice.lower() == "fix-session":
+        await fix_telegram_session_lock()
+        return
+        return
+
     # Config tanlash
     if not choice.isdigit() or not (1 <= int(choice) <= len(configs_list)):
         logger.info("❌ Noto'g'ri tanlov!")
@@ -83,6 +89,63 @@ async def main():
 
     # 2️⃣ Config tanlangandan keyin rejimlarni ko'rsatamiz
     await show_config_menu(CONFIG, site_name)
+
+
+async def clear_downloads_cache():
+    """Downloads papkasini tozalash"""
+    downloads_path = Path("downloads")
+
+
+async def fix_telegram_session_lock():
+    """Telegram session database lock muammosini hal qilish"""
+    try:
+        logger.info("🔧 Telegram session lock muammosini hal qilish...")
+
+        # Session fayl path
+        session_files = [
+            "telegramuploader/session.session",
+            "telegramuploader/session.session-journal",
+            "telegramuploader/session.session-wal",
+            "telegramuploader/session.session-shm"
+        ]
+
+        # 1. Telegram processlarini to'xtatish
+        try:
+            import subprocess
+            subprocess.run(["pkill", "-f", "python.*main.py"], check=False)
+            subprocess.run(["pkill", "-f", "telegram"], check=False)
+            await asyncio.sleep(2)  # 2 soniya kutish
+        except Exception:
+            pass
+
+        # 2. Session fayllarini backup va o'chirish
+        session_backup_dir = Path("session_backup")
+        session_backup_dir.mkdir(exist_ok=True)
+
+        for session_file in session_files:
+            session_path = Path(session_file)
+            if session_path.exists():
+                # Backup qilish
+                backup_name = f"{session_path.name}_{int(asyncio.get_event_loop().time())}"
+                backup_path = session_backup_dir / backup_name
+                try:
+                    shutil.copy2(session_path, backup_path)
+                    logger.info(f"📦 Backup: {session_file} -> {backup_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Backup xato {session_file}: {e}")
+
+                # Original faylni o'chirish
+                try:
+                    session_path.unlink()
+                    logger.info(f"🗑️ O'chirildi: {session_file}")
+                except Exception as e:
+                    logger.warning(f"⚠️ O'chirishda xato {session_file}: {e}")
+
+        logger.info(
+            "✅ Telegram session tozalandi, qayta login qilish kerak bo'ladi")
+
+    except Exception as e:
+        logger.error(f"❌ Session tozalashda xato: {e}")
 
 
 async def clear_downloads_cache():
@@ -289,27 +352,27 @@ async def list_all_files(site_name):
     """Barcha fayllar ro'yxatini ko'rsatish"""
     try:
         logger.info(f"\n📋 {site_name} - Barcha fayllar ro'yxati")
-        
+
         db = FileDB()
         files = db.get_files(site_name)
-        
+
         if not files:
             logger.info("❌ Hech qanday fayl topilmadi")
             return
-            
+
         total_files = len(files)
         logger.info(f"📊 Jami fayllar soni: {total_files}")
-        
+
         # Ko'rsatish rejimini tanlash
         logger.info("\n📋 Ko'rsatish rejimi:")
         logger.info("[1] Qisqacha ro'yxat (ID + nom)")
         logger.info("[2] Batafsil ro'yxat (barcha ma'lumotlar)")
         logger.info("[3] Faqat yuklanmagan fayllar")
-        logger.info("[4] Faqat yuklangan fayllar") 
+        logger.info("[4] Faqat yuklangan fayllar")
         logger.info("[5] Sahifa bo'yicha ko'rsatish (20 tadan)")
-        
+
         display_mode = safe_input("Rejimni tanlang → ")
-        
+
         if display_mode == "1":
             await show_files_brief(files)
         elif display_mode == "2":
@@ -327,7 +390,7 @@ async def list_all_files(site_name):
         else:
             logger.info("❌ Noto'g'ri tanlov, qisqacha ko'rsatiladi")
             await show_files_brief(files)
-            
+
     except Exception as e:
         logger.error(f"❌ Fayllar ro'yxatini ko'rsatishda xato: {e}")
 
@@ -336,17 +399,18 @@ async def show_files_brief(files):
     """Qisqacha fayllar ro'yxati"""
     logger.info(f"\n📋 Qisqacha ro'yxat ({len(files)} ta fayl):")
     logger.info("=" * 80)
-    
+
     for i, file in enumerate(files, 1):
         file_id = file.get('id', 'N/A')
         title = file.get('title', 'No title')
         uploaded = "✅" if file.get('uploaded', False) else "❌"
-        local_exists = "💾" if (file.get('local_path') and os.path.exists(file.get('local_path', ''))) else "⬜"
-        
+        local_exists = "💾" if (file.get('local_path') and os.path.exists(
+            file.get('local_path', ''))) else "⬜"
+
         # Uzun nomlarni qisqartirish
         if len(title) > 60:
             title = title[:57] + "..."
-            
+
         logger.info(f"{i:3d}. [{file_id:4}] {uploaded} {local_exists} {title}")
 
 
@@ -354,7 +418,7 @@ async def show_files_detailed(files):
     """Batafsil fayllar ro'yxati"""
     logger.info(f"\n📋 Batafsil ro'yxat ({len(files)} ta fayl):")
     logger.info("=" * 80)
-    
+
     for i, file in enumerate(files, 1):
         logger.info(f"\n📁 [{i}] Fayl #{file.get('id', 'N/A')}")
         logger.info(f"📄 Nom: {file.get('title', 'No title')}")
@@ -362,7 +426,7 @@ async def show_files_detailed(files):
         logger.info(f"🌐 Til: {file.get('language', 'N/A')}")
         logger.info(f"📅 Yil: {file.get('year', 'N/A')}")
         logger.info(f"🎭 Aktyorlar: {file.get('actors', 'N/A')}")
-        
+
         # Local fayl holati
         local_path = file.get('local_path')
         file_size = file.get('file_size', 0)
@@ -372,12 +436,12 @@ async def show_files_detailed(files):
             logger.info(f"📁 Path: {local_path}")
         else:
             logger.info(f"💾 Local: ❌ Yuklanmagan")
-            
+
         # Telegram holati
         uploaded = file.get('uploaded', False)
         telegram_status = "✅ Yuklangan" if uploaded else "❌ Yuklanmagan"
         logger.info(f"📤 Telegram: {telegram_status}")
-        
+
         # Yaratilgan vaqt
         created_at = file.get('created_at', 'N/A')
         logger.info(f"📅 Qo'shilgan: {created_at}")
@@ -388,20 +452,21 @@ async def show_files_paginated(files, page_size=20):
     total_files = len(files)
     total_pages = (total_files + page_size - 1) // page_size
     current_page = 1
-    
+
     while True:
         start_idx = (current_page - 1) * page_size
         end_idx = min(start_idx + page_size, total_files)
         page_files = files[start_idx:end_idx]
-        
-        logger.info(f"\n📋 Sahifa {current_page}/{total_pages} ({start_idx + 1}-{end_idx} fayllar)")
+
+        logger.info(
+            f"\n📋 Sahifa {current_page}/{total_pages} ({start_idx + 1}-{end_idx} fayllar)")
         logger.info("=" * 80)
-        
+
         await show_files_brief(page_files)
-        
+
         if total_pages <= 1:
             break
-            
+
         logger.info(f"\n📄 Sahifa navigatsiyasi:")
         if current_page > 1:
             logger.info("[p] Oldingi sahifa")
@@ -409,9 +474,9 @@ async def show_files_paginated(files, page_size=20):
             logger.info("[n] Keyingi sahifa")
         logger.info("[q] Chiqish")
         logger.info(f"[1-{total_pages}] Sahifa raqami")
-        
+
         choice = safe_input("Tanlovingiz → ").lower()
-        
+
         if choice == 'q' or choice == 'quit':
             break
         elif choice == 'p' and current_page > 1:
@@ -423,7 +488,8 @@ async def show_files_paginated(files, page_size=20):
             if 1 <= page_num <= total_pages:
                 current_page = page_num
             else:
-                logger.info(f"❌ Sahifa raqami 1-{total_pages} oralig'ida bo'lishi kerak")
+                logger.info(
+                    f"❌ Sahifa raqami 1-{total_pages} oralig'ida bo'lishi kerak")
         else:
             logger.info("❌ Noto'g'ri tanlov")
 
