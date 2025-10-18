@@ -21,7 +21,20 @@ sys.path.append(str(root_dir))
 current_dir = Path(__file__).parent.parent  # telegramuploader/
 session_path = current_dir / f"session_{phone}.session"
 
-Telegram_client = TelegramClient(str(session_path), api_id, api_hash)
+# Session lock conflict ni oldini olish uchun connection parametrlari
+import asyncio
+_session_lock = asyncio.Lock()
+
+# SQLite timeout bilan Telegram client
+Telegram_client = TelegramClient(
+    str(session_path), 
+    api_id, 
+    api_hash,
+    connection_retries=3,
+    retry_delay=2,
+    timeout=30,
+    request_retries=2
+)
 
 
 async def send_startup_messages(client=Telegram_client):
@@ -56,12 +69,26 @@ async def send_startup_messages(client=Telegram_client):
 
 
 # 🔑 Guruh yoki kanal entity aniqlash
+async def safe_telegram_start():
+    """Session lock bilan xavfsiz Telegram start"""
+    async with _session_lock:
+        try:
+            if not Telegram_client.is_connected():
+                logger.info("🔌 Telegram client ulanmoqda...")
+                await Telegram_client.start()
+                logger.info("✅ Telegram client ulandi")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Telegram start xato: {e}")
+            return False
+
 async def resolve_group(group_ref: str):
     """
     group_ref -> int ID (-100...), yoki username (@channel), yoki invite link (https://t.me/...)
     """
     try:
-        await Telegram_client.start()
+        if not await safe_telegram_start():
+            return None
 
         # Agar ID bo'lsa (int yoki str shaklda)
         if isinstance(group_ref, int) or (

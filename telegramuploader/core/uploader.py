@@ -477,11 +477,10 @@ class TelegramUploader:
 
     async def _get_telegram_entity(self, group_ref: Optional[str] = None):
         """Telegram entity olish"""
-        # 📌 Telegram client ulanganligini tekshiramiz
-        if not Telegram_client.is_connected():
-            # logger.warning(
-            #     "⚠️ Telegram client ulanmagan, qayta ulanishga harakat qilamiz")
-            await Telegram_client.connect()
+        # 📌 Telegram client ulanganligini tekshiramiz (session safe)
+        from telegramuploader.telegram.telegram_client import safe_telegram_start
+        if not await safe_telegram_start():
+            return None
 
         # 📌 Guruhni aniqlaymiz
         target_group = group_ref or self.default_group

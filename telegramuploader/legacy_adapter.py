@@ -358,56 +358,84 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
         matched_files = sorted(matched_files, key=lambda x: x["file_size"])
         logger.info("📊 Fayllar hajm bo'yicha tartiblandi (kichikdan kattaga)")
     
-    # Telegram client'ni ishga tushirish
-    async with Telegram_client:
-        await send_startup_messages(client=Telegram_client)
-        
-        # Orchestrator yaratish
-        orchestrator = TelegramUploaderOrchestrator(CONFIG)
-        
-        # Har bir faylni yuklash
-        uploaded_count = 0
-        failed_count = 0
-        
-        for file_info in matched_files:
-            local_path = file_info["local_path"]
-            db_file = file_info["db_file"]
+    # Telegram client connection (session lock retry bilan)
+    max_retries = 3
+    connection_success = False
+    
+    for retry_count in range(max_retries):
+        try:
+            logger.info(f"🔌 Telegram connection urinish {retry_count + 1}/{max_retries}")
             
-            try:
-                logger.info(f"📤 Yuklanmoqda: {Path(local_path).name}")
+            async with Telegram_client:
+                await send_startup_messages(client=Telegram_client)
                 
-                # Upload qilish
-                # File data ni uploader uchun tayyorlash
-                upload_item = db_file.copy()
-                upload_item["local_path"] = local_path
+                # Orchestrator yaratish
+                orchestrator = TelegramUploaderOrchestrator(CONFIG)
                 
-                success = await orchestrator.uploader.upload_file(
-                    item=upload_item,
-                    config=CONFIG
-                )
+                # Connection muvaffaqiyatli
+                connection_success = True
                 
-                if success:
-                    # Database'da uploaded = True qilish
-                    db_id = file_info.get("db_id")
-                    if db_id:
-                        db.update_file(db_id, uploaded=True)
-                    uploaded_count += 1
-                    logger.info(f"✅ Yuklandi: {Path(local_path).name}")
+                # Har bir faylni yuklash
+                uploaded_count = 0
+                failed_count = 0
+                
+                for file_info in matched_files:
+                    local_path = file_info["local_path"]
+                    db_file = file_info["db_file"]
                     
-                    # Clear uploaded files agar enabled bo'lsa
-                    if CONFIG.get("clear_uploaded_files", False):
-                        try:
-                            os.remove(local_path)
-                            logger.info(f"🗑️ O'chirildi: {Path(local_path).name}")
-                        except Exception as e:
-                            logger.warning(f"⚠️ Faylni o'chirishda xato: {e}")
-                else:
-                    failed_count += 1
-                    logger.error(f"❌ Yuklanmadi: {Path(local_path).name}")
-                    
-            except Exception as e:
-                failed_count += 1
-                logger.error(f"❌ Xato {Path(local_path).name}: {e}")
+                    try:
+                        logger.info(f"📤 Yuklanmoqda: {Path(local_path).name}")
+                        
+                        # File data ni uploader uchun tayyorlash
+                        upload_item = db_file.copy()
+                        upload_item["local_path"] = local_path
+                        
+                        success = await orchestrator.uploader.upload_file(
+                            item=upload_item,
+                            config=CONFIG
+                        )
+                        
+                        if success:
+                            # Database'da uploaded = True qilish
+                            db_id = file_info.get("db_id")
+                            if db_id:
+                                db.update_file(db_id, uploaded=True)
+                            uploaded_count += 1
+                            logger.info(f"✅ Yuklandi: {Path(local_path).name}")
+                            
+                            # Clear uploaded files agar enabled bo'lsa
+                            if CONFIG.get("clear_uploaded_files", False):
+                                try:
+                                    os.remove(local_path)
+                                    logger.info(f"🗑️ O'chirildi: {Path(local_path).name}")
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Faylni o'chirishda xato: {e}")
+                        else:
+                            failed_count += 1
+                            logger.error(f"❌ Yuklanmadi: {Path(local_path).name}")
+                            
+                    except Exception as e:
+                        failed_count += 1
+                        logger.error(f"❌ Xato {Path(local_path).name}: {e}")
+                
+                # Muvaffaqiyatli bo'lsa, retry loop dan chiqish
+                break
+                
+        except Exception as e:
+            if "database is locked" in str(e).lower():
+                logger.warning(f"⚠️ Session locked, retry {retry_count + 1}/{max_retries}...")
+                await asyncio.sleep(retry_count + 1)  # 1, 2, 3 soniya kutish
+                if retry_count == max_retries - 1:
+                    logger.error("❌ Session lock hal qilinmadi!")
+                    logger.error("💡 Terminal: python unlock_session.py")
+                    return
+            else:
+                logger.error(f"❌ Telegram connection xato: {e}")
+                return
+    
+    if not connection_success:
+        logger.error("❌ Telegram connection muvaffaqiyatsiz!")
+        return
     
     # Yakuniy hisobot
     logger.info(f"\n✅ Upload Only jarayoni tugadi!")
