@@ -265,54 +265,57 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
         telegram_status = "✅ Yuklangan" if db_file.get("telegram_uploaded", False) else "❌ Yuklanmagan"
         logger.info(f"  [{i+1}] DB: '{db_file.get('name', 'unknown')}' → File: '{expected_filename}' ({telegram_status})")
     
-    # Mavjud fayllarni database bilan match qilish - KENG SEARCH
+    # ANIQ DATABASE MATCH - local_path orqali
     matched_files = []
     unmatched_files = []
     
+    logger.info("🔍 Database'dagi local_path'lar bilan match qilish...")
+    
     for local_file in existing_files:
         local_filename = local_file.name
+        local_size = local_file.stat().st_size
         file_matched = False
         
-        # Safe filename hosil qilish
+        # Database'dagi barcha fayllarni tekshirish
         for db_file in all_files:
-            expected_filename = safe_filename(db_file.get("name", "unknown"))
+            db_local_path = db_file.get("local_path", "")
             
-            # 1. Aniq match
-            if local_filename == expected_filename:
+            # Local path mavjud bo'lsa va fayl nomi mos kelsa
+            if db_local_path and Path(db_local_path).name == local_filename:
                 telegram_uploaded = db_file.get("telegram_uploaded", False)
-                logger.info(f"🎯 ANIQ MATCH: '{local_filename}' = '{expected_filename}' (TG: {telegram_uploaded})")
+                db_file_size = db_file.get("file_size", 0)
+                
+                logger.info(f"🎯 PATH MATCH: '{local_filename}'")
+                logger.info(f"   DB path: {db_local_path}")
+                logger.info(f"   Hajm: lokal={local_size:,} vs db={db_file_size:,}")
+                logger.info(f"   Telegram: {telegram_uploaded}")
+                
+                # File size check - 1% tolerance
+                size_diff = abs(local_size - db_file_size) if db_file_size > 0 else 0
+                size_tolerance = max(local_size * 0.01, 1024)  # 1% yoki 1KB
+                
+                if db_file_size > 0 and size_diff > size_tolerance:
+                    logger.warning(f"⚠️ Hajm mos kelmaydi: {size_diff:,} bytes farq")
+                    logger.info(f"🗑️ Buzuq fayl o'chiriladi: {local_filename}")
+                    try:
+                        os.remove(local_file)
+                        logger.info(f"✅ O'chirildi: {local_filename}")
+                    except Exception as e:
+                        logger.error(f"❌ O'chirishda xato: {e}")
+                    file_matched = True
+                    break
+                
+                # Faqat telegram'ga yuklanmagan fayllarni qo'shish
                 if not telegram_uploaded:
                     matched_files.append({
                         "local_path": str(local_file),
                         "db_file": db_file,
-                        "file_size": local_file.stat().st_size
+                        "file_size": local_size
                     })
-                file_matched = True
-                break
-            
-            # 2. StartsWith match 
-            elif local_filename.startswith(expected_filename):
-                telegram_uploaded = db_file.get("telegram_uploaded", False)
-                logger.info(f"🎯 STARTS MATCH: '{local_filename}' starts with '{expected_filename}' (TG: {telegram_uploaded})")
-                if not telegram_uploaded:
-                    matched_files.append({
-                        "local_path": str(local_file),
-                        "db_file": db_file,
-                        "file_size": local_file.stat().st_size
-                    })
-                file_matched = True
-                break
-            
-            # 3. Contains match (keng qidiruv)
-            elif expected_filename in local_filename or local_filename in expected_filename:
-                telegram_uploaded = db_file.get("telegram_uploaded", False)
-                logger.info(f"🎯 CONTAINS MATCH: '{local_filename}' <-> '{expected_filename}' (TG: {telegram_uploaded})")
-                if not telegram_uploaded:
-                    matched_files.append({
-                        "local_path": str(local_file),
-                        "db_file": db_file,
-                        "file_size": local_file.stat().st_size
-                    })
+                    logger.info(f"✅ Yuklash uchun qo'shildi: {local_filename}")
+                else:
+                    logger.info(f"⏭️ Allaqachon yuklangan: {local_filename}")
+                
                 file_matched = True
                 break
         
@@ -328,30 +331,13 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
             logger.info(f"  ... va yana {len(unmatched_files) - 5} ta")
     
     if not matched_files:
-        logger.info("📤 Database bilan match qilingan fayllar topilmadi")
-        
-        # ALTERNATIV YECHIM: Database'siz barcha fayllarni yuklash
-        logger.info("� YECHIM: Database'siz barcha mavjud fayllarni yuklash...")
-        logger.info("⚠️ Bu barcha fayllarni Telegram'ga yuklaydi (duplicate bo'lishi mumkin)")
-        
-        # Foydalanuvchi tasdiqlashi uchun
-        # Real serverda ishlaydi - barcha fayllarni yuklaydi
-        for local_file in existing_files:
-            # Har bir faylni fake db_file sifatida yaratish
-            fake_db_file = {
-                "name": local_file.stem,  # Fayl nomi .mp4 siz
-                "title": local_file.stem.replace("_", " "),
-                "file_url": f"local://{local_file}",
-                "telegram_uploaded": False  # Har doim False
-            }
-            
-            matched_files.append({
-                "local_path": str(local_file),
-                "db_file": fake_db_file,
-                "file_size": local_file.stat().st_size
-            })
-        
-        logger.info(f"💪 {len(matched_files)} ta faylni database'siz yuklash rejimi!")
+        logger.info("📤 Database'da mos keladigan fayllar topilmadi")
+        logger.info("🔒 FAQAT DATABASE REJIMI: Database'da yo'q fayllar yuklanmaydi")
+        logger.info("💡 Yechimlar:")
+        logger.info("   1. Scraping qilib yangi fayllar database'ga qo'shish")
+        logger.info("   2. [reset] rejimi - telegram_uploaded statusini reset qilish")
+        logger.info("   3. Database'dagi local_path'larni tekshirish")
+        return
     
     logger.info(f"📤 {len(matched_files)} ta fayl Telegramga yuklanadi")
     
