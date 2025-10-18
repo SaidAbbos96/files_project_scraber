@@ -72,8 +72,8 @@ async def resolve_group(group_ref: str):
             # Username yoki invite link
             entity = await Telegram_client.get_entity(group_ref)
 
-        logger.info(
-            f"✅ Guruh aniqlangan: {entity.id} ({getattr(entity, 'title', 'N/A')})")
+        # logger.info(
+        #     f"✅ Guruh aniqlangan: {entity.id} ({getattr(entity, 'title', 'N/A')})")
         return entity
     except Exception as e:
         logger.error(f"❌ Guruhni aniqlab bo'lmadi: {e}")

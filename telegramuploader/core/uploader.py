@@ -45,8 +45,8 @@ class TelegramUploader:
             # Method 1: Direct subprocess with system tools
             video_info = self._get_video_info_direct(file_path)
             if video_info:
-                logger.info(
-                    f"📹 Direct method: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
+                # logger.info(
+                #     f"📹 Direct method: {video_info['width']}x{video_info['height']}, {video_info['duration']:.1f}s")
                 return DocumentAttributeVideo(
                     duration=int(video_info['duration']),
                     w=video_info['width'],
@@ -99,7 +99,7 @@ class TelegramUploader:
                         height = int(video_stream.get('height', 720))
                         duration = float(
                             data.get('format', {}).get('duration', 0))
-                        logger.info(f"✅ Direct ffprobe success: {cmd}")
+                        # logger.info(f"✅ Direct ffprobe success: {cmd}")
                         return {'width': width, 'height': height, 'duration': duration}
 
                 except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired) as e:
@@ -238,8 +238,8 @@ class TelegramUploader:
                             logger.warning(
                                 f"⚠️ Juda uzun video: {duration/3600:.1f}h")
 
-                    logger.info(
-                        f"✅ Video validation OK: {width}x{height}, {codec}, {duration:.1f}s")
+                    # logger.info(
+                    #     f"✅ Video validation OK: {width}x{height}, {codec}, {duration:.1f}s")
                     return True, f"Video valid: {width}x{height}, {codec}"
 
                 except subprocess.CalledProcessError as e:

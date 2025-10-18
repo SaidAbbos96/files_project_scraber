@@ -262,7 +262,7 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
     logger.info("🔍 DIAGNOSTIKA: Database dagi fayllar:")
     for i, db_file in enumerate(all_files[:3]):
         expected_filename = safe_filename(db_file.get("name", "unknown"))
-        telegram_status = "✅ Yuklangan" if db_file.get("telegram_uploaded", False) else "❌ Yuklanmagan"
+        telegram_status = "✅ Yuklangan" if db_file.get("uploaded", False) else "❌ Yuklanmagan"
         logger.info(f"  [{i+1}] DB: '{db_file.get('name', 'unknown')}' → File: '{expected_filename}' ({telegram_status})")
     
     # ANIQ DATABASE MATCH - local_path orqali
@@ -294,7 +294,7 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
                         continue
                         
                 if file_matched:
-                    telegram_uploaded = db_file.get("telegram_uploaded", False)
+                    telegram_uploaded = db_file.get("uploaded", False)
                     db_file_size = db_file.get("file_size", 0)
                     
                     logger.info(f"🎯 PATH MATCH: '{local_filename}'")
@@ -346,7 +346,7 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
         logger.info("🔒 FAQAT DATABASE REJIMI: Database'da yo'q fayllar yuklanmaydi")
         logger.info("💡 Yechimlar:")
         logger.info("   1. Scraping qilib yangi fayllar database'ga qo'shish")
-        logger.info("   2. [reset] rejimi - telegram_uploaded statusini reset qilish")
+        logger.info("   2. [reset] rejimi - uploaded statusini reset qilish")
         logger.info("   3. Database'dagi local_path'larni tekshirish")
         return
     
