@@ -298,8 +298,8 @@ class TelegramUploader:
         filename = "unknown"  # default qiymat
         start_time = time.time()  # Upload boshlanish vaqti
         try:
-            logger.info(
-                f"🔍 Upload funksiyasiga kirildi: {item.get('title', 'No title')}")
+            # logger.info(
+            #     f"🔍 Upload funksiyasiga kirildi: {item.get('title', 'No title')}")
 
             # Debug: item structure
             # logger.info(f"🔍 Item keys: {list(item.keys())}")
@@ -310,8 +310,8 @@ class TelegramUploader:
                 output_path = os.path.abspath(item["local_path"])
                 filename = Path(output_path).name
                 size = item.get("file_size", 0)
-                logger.info(f"📁 Fayl path: {output_path}")
-                logger.info(f"💾 Fayl hajmi: {size} bytes")
+                # logger.info(f"📁 Fayl path: {output_path}")
+                # logger.info(f"💾 Fayl hajmi: {size} bytes")
             except Exception as path_error:
                 duration = time.time() - start_time
                 logger.error(f"❌ Path olishda xato: {path_error}")
@@ -329,7 +329,7 @@ class TelegramUploader:
             # 🎬 Video validation - telegramga yuborishdan avval tekshirish
             file_ext = Path(output_path).suffix.lower()
             if file_ext in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']:
-                logger.info(f"🎬 Video fayl validation: {filename}")
+                # logger.info(f"🎬 Video fayl validation: {filename}")
                 is_valid, reason = self.validate_video_file(output_path)
 
                 if not is_valid:
@@ -356,7 +356,7 @@ class TelegramUploader:
 
             # logger.info(
             #     f"✅ Guruh aniqlandi: {getattr(entity, 'title', str(entity))} !")
-            logger.info(f"📤 Telegram send_file ishga tushmoqda...")
+            # logger.info(f"📤 Telegram send_file ishga tushmoqda...")
 
             # 📤 Timeout siz upload - muvaffaqiyatli yuklashni to'xtatmaymiz
             with tqdm(total=size, unit="B", unit_scale=True, desc=f"📤 {filename}") as bar:
@@ -372,8 +372,8 @@ class TelegramUploader:
                     video_attr = self.get_video_attributes(output_path)
                     if video_attr:
                         attributes = [video_attr]
-                        logger.info(
-                            f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
+                        # logger.info(
+                        #     f"🎬 Video attributes: {video_attr.w}x{video_attr.h}, {video_attr.duration}s")
 
                 await Telegram_client.send_file(
                     entity,
@@ -479,8 +479,8 @@ class TelegramUploader:
         """Telegram entity olish"""
         # 📌 Telegram client ulanganligini tekshiramiz
         if not Telegram_client.is_connected():
-            logger.warning(
-                "⚠️ Telegram client ulanmagan, qayta ulanishga harakat qilamiz")
+            # logger.warning(
+            #     "⚠️ Telegram client ulanmagan, qayta ulanishga harakat qilamiz")
             await Telegram_client.connect()
 
         # 📌 Guruhni aniqlaymiz

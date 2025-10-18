@@ -387,10 +387,10 @@ async def upload_only_mode(CONFIG: Dict[str, Any]) -> None:
                 )
                 
                 if success:
-                    # Database'da telegram_uploaded = True qilish
+                    # Database'da uploaded = True qilish
                     db_id = file_info.get("db_id")
                     if db_id:
-                        db.update_file(db_id, telegram_uploaded=True)
+                        db.update_file(db_id, uploaded=True)
                     uploaded_count += 1
                     logger.info(f"✅ Yuklandi: {Path(local_path).name}")
                     
