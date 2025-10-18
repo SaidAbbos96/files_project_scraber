@@ -76,6 +76,38 @@ class DiskMonitor:
 
         return has_space
 
+    def can_continue_upload(self) -> bool:
+        """
+        Upload jarayonini davom ettirish mumkinligini tekshirish
+        
+        Bu method disk space kam bo'lsa ham True qaytaradi,
+        chunki mavjud fayllarni telegramga yuklash disk space ni
+        bo'shatishga yordam beradi.
+        
+        Returns:
+            True - upload davom etsin (disk space kam bo'lsa ham)
+        """
+        usage = self.get_disk_usage()
+        
+        # Agar juda ham kam joy qolgan bo'lsa (1GB dan kam), upload ham to'xtatamiz
+        critical_threshold = 1.0 * 1024 ** 3  # 1GB bytes
+        
+        if usage["free_bytes"] < critical_threshold:
+            logger.warning(
+                f"🔴 CRITICAL: Disk space juda kam ({usage['free_gb']:.2f} GB), "
+                f"upload ham to'xtatildi"
+            )
+            return False
+        
+        # 1GB dan ortiq joy bor - upload davom etsin
+        if usage["free_bytes"] < self.min_free_bytes:
+            logger.info(
+                f"⚠️ Disk space kam ({usage['free_gb']:.2f} GB), "
+                f"lekin upload davom etadi (fayllar o'chiriladi)"
+            )
+        
+        return True
+
     async def wait_for_space(self, required_bytes: int = 0, max_wait_minutes: int = 30) -> bool:
         """
         Disk joy bo'lishini kutish

@@ -164,54 +164,66 @@ class FileProducer:
         filename = os.path.basename(file_path)
         size_gb = url_size / (1024 ** 3) if url_size else 0
 
-        # 🔍 Disk joy tekshiruvi
+        # 🔍 Disk joy tekshiruvi - faqat yangi download uchun
         disk_monitor = get_disk_monitor()
+        should_download = True
+        
         if disk_monitor and config.get("disk_monitor_enabled", True):
             # Fayl hajmi + minimal joy kerak
             if not disk_monitor.has_enough_space(url_size):
-                logger.warning(f"⏸️ [{file_info['id']}] DISK JOY KAM! Download kutmoqda...")
+                logger.warning(f"⏸️ [{file_info['id']}] DISK JOY KAM! Yangi download skip qilinadi...")
                 logger.info(disk_monitor.get_status_message())
                 
                 # Eski fayllarni tozalash (agar yoqilgan bo'lsa)
                 if config.get("cleanup_old_files", True):
-                    await disk_monitor.cleanup_old_files(
-                        max_age_hours=config.get("file_max_age_hours", 24)
+                    cleaned = await disk_monitor.cleanup_old_files(
+                        max_age_hours=config.get("file_max_age_hours", 1)  # 1 soat eski fayllar
                     )
+                    if cleaned > 0:
+                        logger.info(f"🧹 {cleaned} ta eski fayl tozalandi")
                 
-                # Disk joy bo'lishini kutish
-                max_wait = config.get("max_wait_for_space_minutes", 30)
-                success = await disk_monitor.wait_for_space(url_size, max_wait)
+                # Download qilmaslik
+                should_download = False
+                logger.info(f"⏭️ [{file_info['id']}] Download skip qilindi, mavjud fayllar telegram upload davom etadi")
                 
-                if not success:
-                    logger.error(f"❌ [{file_info['id']}] Timeout: Disk joy yetarli emas, download bekor qilindi")
-                    if not self._quiet_mode:
-                        await self.notifier.send_message(
-                            f"⏰ TIMEOUT: Disk joy yetarli emas\n"
-                            f"📄 {file_info['title']}\n"
-                            f"💾 Kerak: {size_gb:.2f} GB"
-                        )
-                    return 0
+                if not self._quiet_mode:
+                    await self.notifier.send_message(
+                        f"⏸️ DISK SPACE KAM: Download skip\n"
+                        f"📄 {file_info['title']}\n"
+                        f"💾 Kerak: {size_gb:.2f} GB\n"
+                        f"📤 Mavjud fayllar upload davom etadi"
+                    )
 
-        # logger.info(f"📥 [{file_info['id']}] Download boshlandi: {filename}")
+        # Download jarayoni - faqat disk space yetarli bo'lsa
+        if should_download:
+            # logger.info(f"📥 [{file_info['id']}] Download boshlandi: {filename}")
 
-        # Notification yuborish
-        if not self._quiet_mode:
-            await self.notifier.send_file_start(file_info["title"], file_info["id"], filename, size_gb)
-
-        # Download jarayoni
-        size = await self.downloader.download(session, semaphore, file_info["file_url"], file_path, filename)
-        logger.info(
-            f"📥 [{file_info['id']}] Download tugadi: {filename} - size: {size}")
-
-        if not size:
-            logger.error(
-                f"❌ [{file_info['id']}] Yuklash muvaffaqiyatsiz: {filename}")
+            # Notification yuborish
             if not self._quiet_mode:
-                await self.notifier.send_file_failed(file_info["title"], file_info["id"], filename)
-            return None
+                await self.notifier.send_file_start(file_info["title"], file_info["id"], filename, size_gb)
 
-        # Yuklangan fayl hajmini tekshirish
-        return self._verify_downloaded_file(file_path, size)
+            size = await self.downloader.download(session, semaphore, file_info["file_url"], file_path, filename)
+            logger.info(
+                f"📥 [{file_info['id']}] Download tugadi: {filename} - size: {size}")
+
+            if not size:
+                logger.error(
+                    f"❌ [{file_info['id']}] Yuklash muvaffaqiyatsiz: {filename}")
+                if not self._quiet_mode:
+                    await self.notifier.send_file_failed(file_info["title"], file_info["id"], filename)
+                return None
+
+            # Yuklangan fayl hajmini tekshirish
+            return self._verify_downloaded_file(file_path, size)
+        else:
+            # Download skip - mavjud fayl bormi tekshiramiz
+            if os.path.exists(file_path):
+                size = os.path.getsize(file_path)
+                logger.info(f"📁 [{file_info['id']}] Mavjud fayl topildi: {filename} - size: {size}")
+                return self._verify_downloaded_file(file_path, size)
+            else:
+                logger.info(f"⏭️ [{file_info['id']}] Fayl yo'q, skip qilindi: {filename}")
+                return None
 
     def _verify_downloaded_file(self, file_path: str, size: int) -> int:
         """Yuklangan faylni tekshirish"""
