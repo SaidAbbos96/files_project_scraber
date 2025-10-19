@@ -11,7 +11,7 @@ from core.config import APP_CONFIG, BROWSER_CONFIG, DB_PATH
 from core.site_configs import SITE_CONFIGS
 from telegramuploader.legacy_adapter import download_and_upload, upload_only_mode
 from utils.system_diagnostics import SystemDiagnostics
-from session_manager import SessionManager
+from scripts.session_management.session_manager import SessionManager
 
 
 def safe_input(prompt: str, default: str = "") -> str:

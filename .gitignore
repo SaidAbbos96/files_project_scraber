@@ -122,3 +122,7 @@ mainbot/app/database/migrations/versions/*
 *.tmp
 *.temp
 
+# Scripts papkasidagi backup fayllar
+scripts/session_management/session_backup/
+scripts/session_management/session_backups/
+
