@@ -456,11 +456,25 @@ class TelegramUploader:
             title = self._clean_text_for_caption(item.get("title", "No title"))
             caption_parts.append(f"📄 {title}")
 
-            # Categories
+            # Categories (hashtag ko'rinishida)
             if categories:
                 clean_categories = [self._clean_text_for_caption(
                     cat) for cat in categories]
-                caption_parts.append(f"🏷️ {', '.join(clean_categories)}")
+                # Kategoriyalarni hashtag formatida chiqarish
+                hashtag_categories = []
+                for cat in clean_categories:
+                    # Hashtag uchun maxsus belgilarni tozalash
+                    hashtag_text = cat.replace(' ', '_').replace(
+                        '&', 'and').replace('/', '_').replace('-', '_')
+                    hashtag_text = hashtag_text.replace(
+                        '(', '').replace(')', '').replace(',', '_')
+                    hashtag_text = hashtag_text.lower().strip('_')
+                    # Ko'p underscore larni bitta qilish
+                    while '__' in hashtag_text:
+                        hashtag_text = hashtag_text.replace('__', '_')
+                    if hashtag_text:
+                        hashtag_categories.append(f"#{hashtag_text}")
+                caption_parts.append(f"🏷️ {' '.join(hashtag_categories)}")
 
             # Year and Country
             year = item.get("year", "")
@@ -499,15 +513,17 @@ class TelegramUploader:
                     clean_desc = clean_desc[:197] + "..."
                 caption_parts.append(f"📝 {clean_desc}")
 
-            # URL (agar kerak bo'lsa)
+            # URL (agar kerak bo'lsa) - URL ni clean qilmaslik uchun oxirida qo'shamiz
             url = item.get("file_url", "")
-            if url and len(url) < 100:  # Faqat qisqa URL larni qo'shamiz
-                caption_parts.append(f"🔗 {url}")
 
             caption = "\n".join(caption_parts)
 
-            # Final tozalash - caption da qolgan har qanday HTML belgini tozalash
+            # Final tozalash - URL qo'shilishidan oldin (URL ni himoya qilish uchun)
             caption = self._final_caption_cleanup(caption)
+
+            # URL ni clean qilingan caption ga qo'shish
+            if url and len(url) < 100:  # Faqat qisqa URL larni qo'shamiz
+                caption += f"\n🔗 {url}"
 
             caption = caption[:4096]  # Telegram limit
             # logger.info("✅ Caption yaratildi (HTML-siz)")
@@ -595,12 +611,12 @@ class TelegramUploader:
         # Worker emoji va nomini himoya qilish
         worker_pattern = r'🤖\s+[\w\d_-]+'
         worker_matches = re.findall(worker_pattern, caption)
-        
+
         telegram_special = ['*', '_', '`', '[', ']',
                             '~', '|', '+', '-', '=', '.', '!']
         for char in telegram_special:
             caption = caption.replace(char, '')
-        
+
         # Worker pattern'ni qaytarish
         for match in worker_matches:
             caption = re.sub(r'🤖\s*\w+', match, caption, count=1)
