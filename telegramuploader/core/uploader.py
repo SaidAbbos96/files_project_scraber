@@ -2,9 +2,11 @@
 Telegram Uploader - Telegramga fayl yuborish uchun
 """
 import time
+import html
+import re
 from core.config import FILES_GROUP_LINK
 from utils.logger_core import logger
-from utils.helpers import categories_to_ids, make_caption
+from utils.helpers import categories_to_ids, make_caption, format_file_size
 from telegramuploader.utils.diagnostics import diagnostics
 from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
 import os
@@ -426,7 +428,7 @@ class TelegramUploader:
             return False
 
     async def _create_caption(self, item: Dict[str, Any], size: int) -> str:
-        """Caption yaratish"""
+        """Caption yaratish - HTML-siz oddiy matn formatida"""
         # logger.info("🔍 Caption yaratish boshlandi")
         logo = item.get("image", None)
         # logo ni faqat to'g'ri URL bo'lsa yoki data:image emas va None emas bo'lsa qo'shamiz
@@ -448,32 +450,166 @@ class TelegramUploader:
             elif not isinstance(categories, list):
                 categories = []
 
-            caption_data = {
-                "title": item.get("title", "No title"),
-                "lang": item.get("language", "uz"),
-                "category_id": ", ".join(
-                    map(str, categories_to_ids(categories))
-                ),
-                "actors": item.get("actors") or "",
-                "year": item.get("year") or "",
-                "country": item.get("country") or "",
-                "categories": ", ".join(categories),
-                "file_size": size,  # ✅ Bytes formatda
-                "url": item.get("file_url") or "",
-                "desc": (item.get("description") or "")[:500],
-            }
-            if logo:
-                # faqat logo mavjud va to'g'ri bo'lsa qo'shamiz
-                caption_data["logo"] = logo
+            # Caption yaratish - oddiy matn formatida (HTML-siz)
+            caption_parts = []
 
-            caption = make_caption(caption_data)
+            # Title
+            title = self._clean_text_for_caption(item.get("title", "No title"))
+            caption_parts.append(f"📄 {title}")
+
+            # Categories
+            if categories:
+                clean_categories = [self._clean_text_for_caption(
+                    cat) for cat in categories]
+                caption_parts.append(f"🏷️ {', '.join(clean_categories)}")
+
+            # Year and Country
+            year = item.get("year", "")
+            country = item.get("country", "")
+            if year or country:
+                year_country = []
+                if year:
+                    year_country.append(str(year))
+                if country:
+                    year_country.append(self._clean_text_for_caption(country))
+                caption_parts.append(f"📅 {' | '.join(year_country)}")
+
+            # Actors
+            actors = item.get("actors", "")
+            if actors:
+                clean_actors = self._clean_text_for_caption(actors)
+                caption_parts.append(f"🎭 {clean_actors}")
+
+            # Language
+            language = item.get("language", "")
+            if language:
+                clean_language = self._clean_text_for_caption(language)
+                caption_parts.append(f"🌐 {clean_language}")
+
+            # File size
+            caption_parts.append(f"💾 {format_file_size(size)}")
+
+            # Description (qisqartirilgan)
+            description = item.get("description", "")
+            if description:
+                clean_desc = self._clean_text_for_caption(description)
+                if len(clean_desc) > 200:
+                    clean_desc = clean_desc[:197] + "..."
+                caption_parts.append(f"📝 {clean_desc}")
+
+            # URL (agar kerak bo'lsa)
+            url = item.get("file_url", "")
+            if url and len(url) < 100:  # Faqat qisqa URL larni qo'shamiz
+                caption_parts.append(f"🔗 {url}")
+
+            caption = "\n".join(caption_parts)
+
+            # Final tozalash - caption da qolgan har qanday HTML belgini tozalash
+            caption = self._final_caption_cleanup(caption)
+
             caption = caption[:4096]  # Telegram limit
-            # logger.info("✅ Caption yaratildi")
+            # logger.info("✅ Caption yaratildi (HTML-siz)")
             # logger.info(f"📝 Caption uzunligi: {len(caption)} belgi")
             return caption
+
         except Exception as caption_error:
             logger.error(f"❌ Caption yaratishda xato: {caption_error}")
-            return f"📄 {item.get('title', 'No title')}\n💾 Hajmi: {size} bytes"
+            clean_title = self._clean_text_for_caption(
+                item.get('title', 'No title'))
+            return f"📄 {clean_title}\n💾 {format_file_size(size)}"
+
+    def _clean_text_for_caption(self, text: str) -> str:
+        """Caption uchun matnni tozalash - butunlay HTML-siz (Enhanced)"""
+        if not text or not isinstance(text, str):
+            return ""
+
+        # HTML entities decode qilish
+        text = html.unescape(text)
+
+        # Barcha HTML teglarni olib tashlash - kuchaytirilan versiya
+        # 1. Script va style teglar ichidagi kontentni butunlay olib tashlash
+        text = re.sub(r'<script[^>]*>.*?</script>', '',
+                      text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<style[^>]*>.*?</style>', '',
+                      text, flags=re.DOTALL | re.IGNORECASE)
+
+        # 2. Barcha HTML teglarni olib tashlash (attributes bilan)
+        text = re.sub(r'<[^>]+>', '', text)
+
+        # 3. HTML entities larni tozalash
+        text = text.replace('&amp;', '&')
+        text = text.replace('&lt;', '<')
+        text = text.replace('&gt;', '>')
+        text = text.replace('&quot;', '"')
+        text = text.replace('&apos;', "'")
+        text = text.replace('&nbsp;', ' ')
+        text = text.replace('&#39;', "'")
+        text = text.replace('&#34;', '"')
+
+        # 4. Ortiqcha bo'shliqlarni tozalash
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        # 5. Telegram uchun xavfli belgilarni tozalash
+        text = text.replace('`', "'")  # Backtick → apostrophe
+        text = text.replace('*', '')   # Asterisk olib tashlash
+        text = text.replace('_', '')   # Underscore olib tashlash
+        text = text.replace('[', '(')  # Square bracket → round bracket
+        text = text.replace(']', ')')
+        text = text.replace('{', '(')  # Curly bracket → round bracket
+        text = text.replace('}', ')')
+
+        # 6. Qolgan HTML-ga o'xshash belgilarni tozalash
+        text = re.sub(r'<+', '', text)  # < belgilar
+        text = re.sub(r'>+', '', text)  # > belgilar
+
+        # 7. Control characters ni olib tashlash
+        text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+
+        return text.strip()
+
+    def _final_caption_cleanup(self, caption: str) -> str:
+        """Caption ni final tozalash - har qanday HTML qoldiqlarini olib tashlash"""
+        if not caption:
+            return ""
+
+        # 1. Barcha HTML teglarni yana bir bor tozalash
+        caption = re.sub(r'<[^>]*>', '', caption)
+
+        # 2. HTML entities lar
+        html_entities = {
+            '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+            '&nbsp;': ' ', '&#39;': "'", '&#34;': '"', '&copy;': '©', '&reg;': '®'
+        }
+        for entity, replacement in html_entities.items():
+            caption = caption.replace(entity, replacement)
+
+        # 3. Numeric HTML entities (&#123; formatida)
+        caption = re.sub(r'&#\d+;', '', caption)
+
+        # 4. Hex HTML entities (&#x123; formatida)
+        caption = re.sub(r'&#x[0-9a-fA-F]+;', '', caption)
+
+        # 5. Telegram parse mode conflicts
+        telegram_special = ['*', '_', '`', '[', ']',
+                            '(', ')', '~', '|', '+', '-', '=', '.', '!']
+        for char in telegram_special:
+            if char in ['(', ')']:  # Bu belgilar OK
+                continue
+            caption = caption.replace(char, '')
+
+        # 6. Multiple spaces va newlines tozalash
+        caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline
+        caption = re.sub(r' {2,}', ' ', caption)       # 2+ space → 1 space
+
+        # 7. Line boshida va oxirida ortiqcha belgilar
+        lines = caption.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            line = line.strip()
+            if line:  # Bo'sh qatorlarni tashlab ketmaslik
+                cleaned_lines.append(line)
+
+        return '\n'.join(cleaned_lines).strip()
 
     async def _get_telegram_entity(self, group_ref: Optional[str] = None):
         """Telegram entity olish"""
