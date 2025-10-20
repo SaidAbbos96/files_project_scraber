@@ -94,6 +94,7 @@ def parse_page_fields(config: dict, html: str, base_url: str) -> dict:
         sel = config["fields"]["meta"].replace("::text", "").strip()
         el = soup.select_one(sel)
         if el:
+            # Faqat ichki textni olish, HTML taglarni olib tashlash
             meta_text = el.get_text("\n", strip=True)
 
     # 🔹 meta_textni key-value dictionaryga ajratamiz
@@ -125,7 +126,8 @@ def parse_page_fields(config: dict, html: str, base_url: str) -> dict:
                 if "::text" in s:
                     el = soup.select_one(s.replace("::text", "").strip())
                     if el:
-                        value = el.get_text(strip=True)
+                        # Faqat ichki textni olish, HTML taglarni olib tashlash, bo'shliqlarni saqlash
+                        value = el.get_text(" ", strip=True)
                 elif "::attr(" in s:
                     q = s.split("::attr(")[0].strip()
                     attr = s.split("::attr(")[1].replace(")", "").strip()
@@ -135,7 +137,8 @@ def parse_page_fields(config: dict, html: str, base_url: str) -> dict:
                 else:
                     el = soup.select_one(s)
                     if el:
-                        value = el.text.strip()
+                        # Faqat ichki textni olish, HTML taglarni olib tashlash, bo'shliqlarni saqlash
+                        value = el.get_text(" ", strip=True)
                 if value:
                     break
 
