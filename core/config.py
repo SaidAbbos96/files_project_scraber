@@ -1,5 +1,4 @@
 from copy import deepcopy
-from anyio import Path
 import os
 from pathlib import Path as PathlibPath
 
@@ -15,6 +14,9 @@ LOGGING_ENABLED = os.getenv(
 FILE_MIN_SIZE = int(
     os.getenv("FILE_MIN_SIZE", str(1024 * 1024)))  # Default: 1MB
 DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
+
+# Worker identification
+WORKER_NAME = os.getenv("WORKER_NAME", "worker_001")
 # --- Umumiy sozlamalar ---
 APP_CONFIG = {
     # --- Directory Settings ---

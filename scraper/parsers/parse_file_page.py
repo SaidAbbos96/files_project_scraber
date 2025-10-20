@@ -16,7 +16,6 @@ from utils.files import get_file_size, get_small_url
 from utils.helpers import normalize_item_categories, normalize_category
 from utils.logger_core import logger
 from utils.text import (
-    clean_title,
     normalize_description,
     normalize_item_fields,
     normalize_item_title,

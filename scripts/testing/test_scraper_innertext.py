@@ -5,11 +5,12 @@ Scraper Inner Text Test - HTML taglarni olib tashlash testi
 
 from bs4 import BeautifulSoup
 
+
 def test_selector_parsing():
     """Selector parsing testlari"""
     print("🧪 Scraper Inner Text Test")
     print("=" * 50)
-    
+
     # Test HTML
     test_html = """
     <html>
@@ -36,9 +37,9 @@ def test_selector_parsing():
         </body>
     </html>
     """
-    
+
     soup = BeautifulSoup(test_html, "html.parser")
-    
+
     # Test selectors
     test_cases = [
         (".title", "Film nomi (HTML taglar bilan)"),
@@ -46,28 +47,28 @@ def test_selector_parsing():
         (".description", "Tavsif (script tag bilan)"),
         (".actors", "Aktörlar (list format)")
     ]
-    
+
     print("📋 Test natijalari:")
     print("-" * 50)
-    
+
     for selector, description in test_cases:
         el = soup.select_one(selector)
         if el:
             # Eski usul (.text)
             old_text = el.text.strip()
-            
+
             # Yangi usul (.get_text(strip=True))
             new_text = el.get_text(strip=True)
-            
+
             # Separator bilan
             sep_text = el.get_text(" ", strip=True)
-            
+
             print(f"\n🎯 {description}")
             print(f"Selector: {selector}")
             print(f"Old (.text):     '{old_text}'")
             print(f"New (get_text):  '{new_text}'")
             print(f"With separator:  '{sep_text}'")
-            
+
             # HTML taglar mavjudligini tekshirish
             html_found = any(char in new_text for char in ['<', '>'])
             if html_found:
@@ -75,12 +76,13 @@ def test_selector_parsing():
             else:
                 print(f"✅ HTML-free")
 
+
 def test_meta_parsing():
     """Meta parsing testi"""
     print(f"\n{'='*50}")
     print("📝 Meta Parsing Test")
     print("-" * 50)
-    
+
     meta_html = """
     <div class="meta-content">
         Janr: <strong>Drama</strong>, <em>Comedy</em>
@@ -91,18 +93,18 @@ def test_meta_parsing():
         Rejissor: <strong class="director">John Smith</strong>
     </div>
     """
-    
+
     soup = BeautifulSoup(meta_html, "html.parser")
     el = soup.select_one(".meta-content")
-    
+
     if el:
         # get_text with newline separator
         meta_text = el.get_text("\n", strip=True)
-        
+
         print("Meta content:")
         print(f"'{meta_text}'")
         print()
-        
+
         # Meta key-value parsing
         meta_data = {}
         for line in meta_text.split("\n"):
@@ -112,20 +114,22 @@ def test_meta_parsing():
                 val = parts[1].strip()
                 meta_data[key] = val
                 print(f"  {key}: {val}")
-        
+
         # HTML check
-        html_found = any('<' in val or '>' in val for val in meta_data.values())
+        html_found = any(
+            '<' in val or '>' in val for val in meta_data.values())
         if html_found:
             print(f"\n⚠️  Meta da HTML tags topildi!")
         else:
             print(f"\n✅ Meta completely HTML-free")
+
 
 def test_field_parsing_simulation():
     """Real field parsing simulation"""
     print(f"\n{'='*50}")
     print("🔧 Field Parsing Simulation")
     print("-" * 50)
-    
+
     # Asilmedia-style HTML
     film_html = """
     <article>
@@ -153,9 +157,9 @@ def test_field_parsing_simulation():
         </div>
     </article>
     """
-    
+
     soup = BeautifulSoup(film_html, "html.parser")
-    
+
     # Simulate config fields
     test_fields = {
         "title": "h1.title",
@@ -164,22 +168,22 @@ def test_field_parsing_simulation():
         "year": "div.meta-section > div:nth-child(1) > span.fullmeta-seclabel",
         "country": "div.meta-section > div:nth-child(2) > span.fullmeta-seclabel"
     }
-    
+
     results = {}
-    
+
     for field, selector in test_fields.items():
         # Eski usul simulation
         el = soup.select_one(selector)
         if el:
             old_value = el.text.strip()
             new_value = el.get_text(strip=True)
-            
+
             results[field] = {
                 "old": old_value,
                 "new": new_value,
                 "html_clean": not any(char in new_value for char in ['<', '>'])
             }
-    
+
     print("Field extraction results:")
     for field, data in results.items():
         print(f"\n📄 {field.upper()}:")
@@ -187,11 +191,12 @@ def test_field_parsing_simulation():
         print(f"  New: '{data['new']}'")
         print(f"  Clean: {'✅' if data['html_clean'] else '❌'}")
 
+
 if __name__ == "__main__":
     test_selector_parsing()
     test_meta_parsing()
     test_field_parsing_simulation()
-    
+
     print(f"\n{'='*50}")
     print("🎯 XULOSA:")
     print("✅ .get_text(strip=True) HTML taglarni to'liq olib tashlaydi")

@@ -1,23 +1,22 @@
 """
 Telegram Uploader - Telegramga fayl yuborish uchun
 """
-import time
 import html
+import os
 import re
-from core.config import FILES_GROUP_LINK
-from utils.logger_core import logger
-from utils.helpers import categories_to_ids, make_caption, format_file_size
-from telegramuploader.utils.diagnostics import diagnostics
-from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
-import os
-import asyncio
-from pathlib import Path
-from tqdm.asyncio import tqdm
-from typing import Dict, Any, Optional
-from telethon.tl.types import DocumentAttributeVideo
-
 import sys
-import os
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from telethon.tl.types import DocumentAttributeVideo
+from tqdm.asyncio import tqdm
+
+from core.config import FILES_GROUP_LINK, WORKER_NAME
+from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
+from telegramuploader.utils.diagnostics import diagnostics
+from utils.helpers import format_file_size
+from utils.logger_core import logger
 # Add the parent directory to sys.path to import telegram module
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(os.path.dirname(current_dir))
@@ -489,6 +488,9 @@ class TelegramUploader:
             # File size
             caption_parts.append(f"💾 {format_file_size(size)}")
 
+            # Worker name (ko'p worker ishlayotganda ajratib olish uchun)
+            caption_parts.append(f"🤖 {WORKER_NAME}")
+
             # Description (qisqartirilgan)
             description = item.get("description", "")
             if description:
@@ -589,13 +591,19 @@ class TelegramUploader:
         # 4. Hex HTML entities (&#x123; formatida)
         caption = re.sub(r'&#x[0-9a-fA-F]+;', '', caption)
 
-        # 5. Telegram parse mode conflicts
+        # 5. Telegram parse mode conflicts (Worker name'ni saqlab qolish)
+        # Worker emoji va nomini himoya qilish
+        worker_pattern = r'🤖\s+[\w\d_-]+'
+        worker_matches = re.findall(worker_pattern, caption)
+        
         telegram_special = ['*', '_', '`', '[', ']',
-                            '(', ')', '~', '|', '+', '-', '=', '.', '!']
+                            '~', '|', '+', '-', '=', '.', '!']
         for char in telegram_special:
-            if char in ['(', ')']:  # Bu belgilar OK
-                continue
             caption = caption.replace(char, '')
+        
+        # Worker pattern'ni qaytarish
+        for match in worker_matches:
+            caption = re.sub(r'🤖\s*\w+', match, caption, count=1)
 
         # 6. Multiple spaces va newlines tozalash
         caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline
