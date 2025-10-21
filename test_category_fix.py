@@ -13,16 +13,16 @@ async def test_category_fix():
     print("🧪 Kategoriya tuzatilishini test qilish")
     print("=" * 50)
     
-    # Test data - sizning misolingiz kabi
+    # Test data - ko'p kategoriyali
     test_item = {
-        "title": "Burulish Mosfilm SSSR kinosi",
-        "categories": "36",  # Drama
-        "year": "1978",
-        "country": "SSSR", 
-        "actors": "Oleg Yankovskiy,Irina Kupchenko,Anatoliy Solonisыn,Lyubov Strijenova,Oleg Anofriyev,Natalya Velichko,Mixail Dadыko",
+        "title": "Nafas olma 3: Muqaddima",
+        "categories": "1,5,20",  # Multiple categories: other, thriller, crime
+        "year": "2022",
+        "country": "SSHA", 
+        "actors": "Stiven Leng,Mark Senter,Patrik Darro,Liana RaytMark",
         "language": "uz",
-        "description": "Yangi turmush qurganlarning Qora dengizdagi sayohati baxtli yakunlanmoqda. Oldinda - Moskva, qiziqarli ish va oilaviy hayotning farovonligi. Ammo fojiali baxtsiz hodisa Vedeneevlarning umidlarini yo'q qiladi - Viktor jinoyatda ayblanadi. Tergov boshlanadi...Счастливо завершается круиз молодоженов по Черному морю. Впереди - Москва, интересная работа и уют семейной жизни. Но трагическая случайность рушит надежды Веденеевых - Виктора обвиняют в преступлении. Начинается следствие...",
-        "file_url": "https://fayllar1.ru/21/kinolar/Burulish 480p O'zbek tilida (asilmedia.net).mp4"
+        "description": "Dashtdagi yolg'iz uyda g'alati bir chol yashaydi Bir kuni adashgan sayyoh uning ichiga kirib ketadi va darhol uy egasida shubha uyg'otadi Chol bosqinchiga qurol ko'rsatadi va savol bera boshlaydi",
+        "file_url": "https://fayllar1.ru/21/kinolar/Nafas olma 3 1080p O'zbek tilida (asilmedia.net).mp4"
     }
     
     # Test hajm
@@ -41,6 +41,12 @@ async def test_category_fix():
         # Hashtag format tekshirish
         if "#title=" in caption and "#category_id=" in caption and "#categories=" in caption:
             print("\n✅ Hashtag format to'g'ri!")
+            
+            # Ko'p kategoriyali format tekshirish
+            if "category_id=1,5,20" in caption and "categories=other,thriller,crime" in caption:
+                print("✅ Ko'p kategoriyali format ham to'g'ri!")
+            else:
+                print("❌ Ko'p kategoriyali formatda muammo")
         else:
             print("\n❌ Hashtag formatda muammo bor!")
             

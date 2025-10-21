@@ -74,6 +74,16 @@ class DiskMonitor:
         has_space = free_bytes > needed
         self._is_paused = not has_space
 
+        # Debug log qo'shish - faqat juda katta file uchun
+        if not has_space and required_bytes > 10 * 1024**3:  # 10GB dan katta
+            logger.debug(
+                f"🔍 DISK SPACE DEBUG (katta fayl):\n"
+                f"   Bo'sh: {free_bytes / (1024**3):.2f} GB\n"
+                f"   Minimal: {self.min_free_bytes / (1024**3):.2f} GB\n"
+                f"   Kerak: {required_bytes / (1024**3):.2f} GB\n"
+                f"   Jami kerak: {needed / (1024**3):.2f} GB"
+            )
+
         return has_space
 
     def can_continue_upload(self) -> bool:

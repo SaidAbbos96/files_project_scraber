@@ -434,27 +434,24 @@ class TelegramUploader:
 
             categories = item.get("categories", [])
             category_names = []
-            category_id = ""
+            category_ids = []
 
             # Agar string bo'lsa, uni split qilamiz
             if isinstance(categories, str):
                 # Agar vergul bilan ajratilgan raqamlar bo'lsa: "1,5,20"
-                category_ids = [cat.strip()
+                raw_category_ids = [cat.strip()
                                 for cat in categories.split(",") if cat.strip()]
-                for cat_id in category_ids:
+                for cat_id in raw_category_ids:
                     try:
                         # String raqamni int ga aylantirish
                         cat_num = int(cat_id)
+                        category_ids.append(str(cat_num))
                         # CATEGORY_MAP dan nom topish
                         if cat_num in CATEGORY_MAP:
                             category_names.append(CATEGORY_MAP[cat_num])
-                            if not category_id:  # Birinchi category_id ni olish
-                                category_id = str(cat_num)
                         else:
                             # Agar raqam yo'q bo'lsa, raqamni o'zini qo'shamiz
                             category_names.append(f"category_{cat_num}")
-                            if not category_id:
-                                category_id = str(cat_num)
                     except ValueError:
                         # Agar raqam emas bo'lsa, matnni o'zini qo'shamiz
                         category_names.append(cat_id)
@@ -464,14 +461,11 @@ class TelegramUploader:
                     if isinstance(cat, (int, str)):
                         try:
                             cat_num = int(cat)
+                            category_ids.append(str(cat_num))
                             if cat_num in CATEGORY_MAP:
                                 category_names.append(CATEGORY_MAP[cat_num])
-                                if not category_id:
-                                    category_id = str(cat_num)
                             else:
                                 category_names.append(f"category_{cat_num}")
-                                if not category_id:
-                                    category_id = str(cat_num)
                         except ValueError:
                             category_names.append(str(cat))
 
@@ -488,9 +482,9 @@ class TelegramUploader:
                 clean_language = self._clean_text_for_caption(language)
                 caption_parts.append(f"#lang={clean_language}")
 
-            # Category ID (birinchi kategoriya ID si)
-            if category_id:
-                caption_parts.append(f"#category_id={category_id}")
+            # Category IDs (vergul bilan ajratilgan raqamlar)
+            if category_ids:
+                caption_parts.append(f"#category_id={','.join(category_ids)}")
 
             # Actors
             actors = item.get("actors", "")
@@ -509,25 +503,37 @@ class TelegramUploader:
                 clean_country = self._clean_text_for_caption(country)
                 caption_parts.append(f"#country={clean_country}")
 
-            # Categories (birinchi kategoriya nomi)
+            # Categories (vergul bilan ajratilgan nomlar)
             if category_names:
-                caption_parts.append(f"#categories={category_names[0]}")
+                caption_parts.append(f"#categories={','.join(category_names)}")
 
             # File size (bytes)
             caption_parts.append(f"#file_size={size}")
 
-            # URL
+            # URL (qo'shtirnoqsiz, toza)
             url = item.get("file_url", "")
             if url:
-                caption_parts.append(f'#url="{url}"')
+                # URL ni tozalash - faqat asosiy belgilarni olib tashlash
+                clean_url = url.strip().replace('"', '').replace("'", '')
+                caption_parts.append(f"#url={clean_url}")
 
-            # Description
+            # Description (kuchli HTML tozalash va qisqartirish)
             description = item.get("description", "")
             if description:
                 clean_desc = self._clean_text_for_caption(description)
+                # Qo'shimcha HTML tozalash description uchun
+                clean_desc = self._extra_html_clean(clean_desc)
+                
+                # Description'ni qisqartirish - 150 belgigacha
+                if len(clean_desc) > 150:
+                    clean_desc = clean_desc[:147] + "..."
+                    
                 caption_parts.append(f"#desc={clean_desc}")
 
             caption = "\n".join(caption_parts)
+            
+            # Final hashtag caption tozalash - oddiy va samarali
+            caption = self._hashtag_caption_cleanup(caption)
             caption = caption[:4096]  # Telegram limit
 
             return caption
@@ -586,6 +592,62 @@ class TelegramUploader:
         text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
 
         return text.strip()
+
+    def _extra_html_clean(self, text: str) -> str:
+        """Qo'shimcha HTML tozalash - description uchun"""
+        if not text or not isinstance(text, str):
+            return ""
+        
+        # HTML class, id, style attributes bilan teglarni olib tashlash
+        text = re.sub(r'<[^>]*class[^>]*>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<[^>]*id[^>]*>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<[^>]*style[^>]*>', '', text, flags=re.IGNORECASE)
+        
+        # Qolgan barcha HTML teglarni olib tashlash
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # HTML entities
+        text = text.replace('&nbsp;', ' ')
+        text = text.replace('&hellip;', '...')
+        text = text.replace('&mdash;', '-')
+        text = text.replace('&ndash;', '-')
+        text = text.replace('&laquo;', '"')
+        text = text.replace('&raquo;', '"')
+        
+        # Ortiqcha bo'shliqlar
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+
+    def _hashtag_caption_cleanup(self, caption: str) -> str:
+        """Hashtag format uchun maxsus tozalash"""
+        if not caption:
+            return ""
+        
+        # Faqat kerakli tozalash - hashtag formatni saqlab qolish
+        # 1. HTML entities tozalash
+        html_entities = {
+            '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+            '&nbsp;': ' ', '&#39;': "'", '&#34;': '"'
+        }
+        for entity, replacement in html_entities.items():
+            caption = caption.replace(entity, replacement)
+
+        # 2. Numeric va hex HTML entities
+        caption = re.sub(r'&#\d+;', '', caption)
+        caption = re.sub(r'&#x[0-9a-fA-F]+;', '', caption)
+
+        # 3. Ortiqcha bo'shliqlar va newline'lar
+        caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline  
+        caption = re.sub(r' {2,}', ' ', caption)       # 2+ space → 1 space
+
+        # 4. Faqat Telegram uchun xavfli belgilarni olib tashlash
+        # Hashtag format uchun `=`, `.`, `-` larni saqlab qolish
+        dangerous_chars = ['`', '~', '|']  # Faqat eng xavfli belgilar
+        for char in dangerous_chars:
+            caption = caption.replace(char, '')
+
+        return caption.strip()
 
     def _final_caption_cleanup(self, caption: str) -> str:
         """Caption ni final tozalash - har qanday HTML qoldiqlarini olib tashlash"""

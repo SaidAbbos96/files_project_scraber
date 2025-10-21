@@ -95,6 +95,18 @@ class FileProducer:
 
         # URL dan file size olish
         url_size = await self.downloader.get_file_size(session, file_info["file_url"])
+        
+        # URL size ni tekshirish va debug
+        if url_size > 100 * 1024**3:  # 100GB dan katta
+            logger.warning(
+                f"🔍 [{file_info['id']}] Juda katta fayl hajmi aniqlandi: {url_size / (1024**3):.2f} GB"
+                f" - 10GB ga cheklandi"
+            )
+            url_size = 10 * 1024**3  # 10GB maksimal
+        elif url_size <= 0:
+            # 0 yoki manfiy qiymat bo'lsa, standart hajm belgilash
+            url_size = 2 * 1024**3  # 2GB default
+            logger.debug(f"🔍 [{file_info['id']}] URL size noma'lum, 2GB default belgilandi")
 
         return output_path, url_size
 
@@ -160,8 +172,17 @@ class FileProducer:
         should_download = True
         
         if disk_monitor and config.get("disk_monitor_enabled", True):
+            # Aqlli disk tekshiruvi - katta fayllar uchun oqilona limit
+            check_size = url_size
+            if url_size > 50 * 1024**3:  # 50GB dan katta
+                check_size = 50 * 1024**3  # 50GB maksimal tekshirish
+                logger.info(
+                    f"🔍 [{file_info['id']}] Katta fayl ({url_size / (1024**3):.2f} GB), "
+                    f"disk tekshiruvi 50GB bilan cheklandi"
+                )
+            
             # Fayl hajmi + minimal joy kerak
-            if not disk_monitor.has_enough_space(url_size):
+            if not disk_monitor.has_enough_space(check_size):
                 logger.warning(f"⏸️ [{file_info['id']}] DISK JOY KAM! Yangi download skip qilinadi...")
                 logger.info(disk_monitor.get_status_message())
                 

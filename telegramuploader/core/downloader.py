@@ -120,7 +120,12 @@ class FileDownloader:
                 if resp.status == 200 and 'content-length' in resp.headers:
                     content_length = resp.headers.get("Content-Length", "0")
                     if content_length and content_length != "0":
-                        return int(content_length)
+                        size = int(content_length)
+                        # Oqilona hajm tekshiruvi - 500GB dan katta bo'lsa, 0 qaytarish
+                        if size > 500 * 1024**3:  # 500GB limit
+                            logger.warning(f"⚠️ Juda katta fayl hajmi (HEAD): {size / (1024**3):.2f} GB, 0 qaytariladi")
+                            return 0
+                        return size
 
             # HEAD ishlamasa, GET so'rov bilan range header ishlatamiz
             headers = {'Range': 'bytes=0-0'}
@@ -133,12 +138,22 @@ class FileDownloader:
                         if '/' in content_range:
                             total_size = content_range.split('/')[-1]
                             if total_size.isdigit():
-                                return int(total_size)
+                                size = int(total_size)
+                                # Oqilona hajm tekshiruvi - 500GB dan katta bo'lsa, 0 qaytarish
+                                if size > 500 * 1024**3:  # 500GB limit
+                                    logger.warning(f"⚠️ Juda katta fayl hajmi (range): {size / (1024**3):.2f} GB, 0 qaytariladi")
+                                    return 0
+                                return size
 
                     # Content-Length headerdan olish
                     content_length = resp.headers.get("Content-Length", "0")
                     if content_length and content_length != "0":
-                        return int(content_length)
+                        size = int(content_length)
+                        # Oqilona hajm tekshiruvi - 500GB dan katta bo'lsa, 0 qaytarish
+                        if size > 500 * 1024**3:  # 500GB limit
+                            logger.warning(f"⚠️ Juda katta fayl hajmi: {size / (1024**3):.2f} GB, 0 qaytariladi")
+                            return 0
+                        return size
 
             logger.warning(f"⚠️ Fayl hajmini aniqlab bo'lmadi: {file_url}")
             return 0
