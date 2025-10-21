@@ -377,13 +377,13 @@ async def main():
     # Special options without config
     logger.info("\n🔧 Sistema rejimlar:")
     logger.info("[info] System Diagnostics")
-    logger.info("[test-upload] Test Upload - Demo fayl yuklash")
-    logger.info("[test-message] Test Message - DB dan video info yuborish")
-    logger.info("[clear-cache] Downloads papkasini tozalash")
-    logger.info("[clear-db] Database faylini tozalash")
-    logger.info("[fix-session] Telegram session lock muammosini hal qilish")
-    logger.info("[session-restore] Backup dan session tiklash")
-    logger.info("[session-list] Session backup larni ko'rish")
+    logger.info("[tu] Test Upload - Demo fayl yuklash")
+    logger.info("[tm] Test Message - DB dan video info yuborish")
+    logger.info("[cc] Downloads papkasini tozalash")
+    logger.info("[cd] Database faylini tozalash")
+    logger.info("[fs] Telegram session lock muammosini hal qilish")
+    logger.info("[sr] Backup dan session tiklash")
+    logger.info("[sl] Session backup larni ko'rish")
 
     choice = safe_input("\nTanlang (raqam yoki komanda) → ")
 
@@ -408,31 +408,31 @@ async def main():
         logger.info("🎉 System Diagnostics yakunlandi!")
         return
 
-    elif choice.lower() == "test-upload":
+    elif choice.lower() in ["tu", "test-upload"]:
         await test_upload_demo()
         return
 
-    elif choice.lower() == "test-message":
+    elif choice.lower() in ["tm", "test-message"]:
         await test_message_demo()
         return
 
-    elif choice.lower() == "clear-cache":
+    elif choice.lower() in ["cc", "clear-cache"]:
         await clear_downloads_cache()
         return
 
-    elif choice.lower() == "clear-db":
+    elif choice.lower() in ["cd", "clear-db"]:
         await clear_database_file()
         return
 
-    elif choice.lower() == "fix-session":
+    elif choice.lower() in ["fs", "fix-session"]:
         session_manager.auto_fix_session()
         return
     
-    elif choice.lower() == "session-restore":
+    elif choice.lower() in ["sr", "session-restore"]:
         session_manager.interactive_restore()
         return
     
-    elif choice.lower() == "session-list":
+    elif choice.lower() in ["sl", "session-list"]:
         show_session_backups(session_manager)
         return
 

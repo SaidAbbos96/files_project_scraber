@@ -345,6 +345,7 @@ class TelegramUploader:
 
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
+
             # logger.info(f"📜 Caption: {caption}")
             # 📌 Telegram connection va entity olish
             entity = await self._get_telegram_entity(group_ref)
@@ -430,7 +431,7 @@ class TelegramUploader:
         """Caption yaratish - hashtag parameter formatida"""
         try:
             # Categories ni to'g'ri formatda olish
-            from core.catigories import CATEGORY_MAP
+            from core.catigories import CATEGORY_MAP, CATEGORY_NAME_TO_ID
 
             categories = item.get("categories", [])
             category_names = []
@@ -438,13 +439,13 @@ class TelegramUploader:
 
             # Agar string bo'lsa, uni split qilamiz
             if isinstance(categories, str):
-                # Agar vergul bilan ajratilgan raqamlar bo'lsa: "1,5,20"
-                raw_category_ids = [cat.strip()
-                                    for cat in categories.split(",") if cat.strip()]
-                for cat_id in raw_category_ids:
+                # Agar vergul bilan ajratilgan raqamlar yoki nomlar bo'lsa: "1,5,20" yoki "other, drama, crime"
+                raw_categories = [cat.strip()
+                                  for cat in categories.split(",") if cat.strip()]
+                for cat_item in raw_categories:
                     try:
-                        # String raqamni int ga aylantirish
-                        cat_num = int(cat_id)
+                        # Avval raqam emasligini tekshiramiz
+                        cat_num = int(cat_item)
                         category_ids.append(str(cat_num))
                         # CATEGORY_MAP dan nom topish
                         if cat_num in CATEGORY_MAP:
@@ -453,22 +454,42 @@ class TelegramUploader:
                             # Agar raqam yo'q bo'lsa, raqamni o'zini qo'shamiz
                             category_names.append(f"category_{cat_num}")
                     except ValueError:
-                        # Agar raqam emas bo'lsa, matnni o'zini qo'shamiz
-                        category_names.append(cat_id)
+                        # Agar raqam emas bo'lsa, nom deb hisoblaymiz va ID topamiz
+                        category_name = cat_item
+                        category_names.append(category_name)
+                        # Nom orqali ID topish
+                        if category_name in CATEGORY_NAME_TO_ID:
+                            category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                        else:
+                            # Agar nom topilmasa ham, default ID berish
+                            logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                            # Default 'other' category ID (1) berish
+                            if 'other' in CATEGORY_NAME_TO_ID:
+                                category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
             elif isinstance(categories, list):
                 # Agar list bo'lsa, har bir elementni tekshiramiz
                 for cat in categories:
                     if isinstance(cat, (int, str)):
                         try:
                             cat_num = int(cat)
-                            category_ids.append(str(cat_num))  # ✅ ID ham qo'shiladi
+                            # ✅ ID ham qo'shiladi
+                            category_ids.append(str(cat_num))
                             if cat_num in CATEGORY_MAP:
                                 category_names.append(CATEGORY_MAP[cat_num])
                             else:
                                 category_names.append(f"category_{cat_num}")
                         except ValueError:
-                            # Agar raqam bo'lmasa, faqat nomini qo'shamiz
-                            category_names.append(str(cat))
+                            # Agar raqam bo'lmasa, nom deb hisoblaymiz
+                            category_name = str(cat)
+                            category_names.append(category_name)
+                            # Nom orqali ID topish
+                            if category_name in CATEGORY_NAME_TO_ID:
+                                category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                            else:
+                                logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                                # Default 'other' category ID berish
+                                if 'other' in CATEGORY_NAME_TO_ID:
+                                    category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
             else:
                 # Agar categories boshqa tur bo'lsa (int, None, etc.)
                 if categories:
@@ -480,7 +501,17 @@ class TelegramUploader:
                         else:
                             category_names.append(f"category_{cat_num}")
                     except (ValueError, TypeError):
-                        category_names.append(str(categories))
+                        # Agar raqam bo'lmasa, nom deb hisoblaymiz
+                        category_name = str(categories)
+                        category_names.append(category_name)
+                        # Nom orqali ID topish
+                        if category_name in CATEGORY_NAME_TO_ID:
+                            category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                        else:
+                            logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                            # Default 'other' category ID berish
+                            if 'other' in CATEGORY_NAME_TO_ID:
+                                category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
 
             # Caption yaratish - hashtag parameter formatida
             caption_parts = []
