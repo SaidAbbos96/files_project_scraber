@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from core import config
+from core.config import WORKER_NAME
 
 
 phone = config.TELEGRAM_PHONE_NUMBER
@@ -57,7 +58,7 @@ async def send_startup_messages(client=Telegram_client):
             entity = await resolve_group(files_group_link)
             if entity:
                 await client.send_message(
-                    entity, f"✅ Downloader bot ishga tushdi va tayyor!\n🕒 {now}"
+                    entity, f"✅ Downloader bot ishga tushdi va tayyor!\n🤖 Bot: {WORKER_NAME}\n🕒 {now}"
                 )
                 logger.info("📨 Guruhga xabar yuborildi")
         except Exception as e:

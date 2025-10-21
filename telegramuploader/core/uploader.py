@@ -345,7 +345,7 @@ class TelegramUploader:
 
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
-            logger.info(f"📜 Caption: {caption}")
+            # logger.info(f"📜 Caption: {caption}")
             # 📌 Telegram connection va entity olish
             entity = await self._get_telegram_entity(group_ref)
             if not entity:
@@ -440,7 +440,7 @@ class TelegramUploader:
             if isinstance(categories, str):
                 # Agar vergul bilan ajratilgan raqamlar bo'lsa: "1,5,20"
                 raw_category_ids = [cat.strip()
-                                for cat in categories.split(",") if cat.strip()]
+                                    for cat in categories.split(",") if cat.strip()]
                 for cat_id in raw_category_ids:
                     try:
                         # String raqamni int ga aylantirish
@@ -471,6 +471,9 @@ class TelegramUploader:
 
             # Caption yaratish - hashtag parameter formatida
             caption_parts = []
+
+            # Bot nomi
+            caption_parts.append(f"#bot={WORKER_NAME}")
 
             # Title
             title = self._clean_text_for_caption(item.get("title", "No title"))
@@ -523,15 +526,15 @@ class TelegramUploader:
                 clean_desc = self._clean_text_for_caption(description)
                 # Qo'shimcha HTML tozalash description uchun
                 clean_desc = self._extra_html_clean(clean_desc)
-                
+
                 # Description'ni qisqartirish - 150 belgigacha
                 if len(clean_desc) > 150:
-                    clean_desc = clean_desc[:147] + "..."
-                    
+                    clean_desc = clean_desc[:500] + "..."
+
                 caption_parts.append(f"#desc={clean_desc}")
 
             caption = "\n".join(caption_parts)
-            
+
             # Final hashtag caption tozalash - oddiy va samarali
             caption = self._hashtag_caption_cleanup(caption)
             caption = caption[:4096]  # Telegram limit
@@ -597,15 +600,15 @@ class TelegramUploader:
         """Qo'shimcha HTML tozalash - description uchun"""
         if not text or not isinstance(text, str):
             return ""
-        
+
         # HTML class, id, style attributes bilan teglarni olib tashlash
         text = re.sub(r'<[^>]*class[^>]*>', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<[^>]*id[^>]*>', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<[^>]*style[^>]*>', '', text, flags=re.IGNORECASE)
-        
+
         # Qolgan barcha HTML teglarni olib tashlash
         text = re.sub(r'<[^>]+>', '', text)
-        
+
         # HTML entities
         text = text.replace('&nbsp;', ' ')
         text = text.replace('&hellip;', '...')
@@ -613,17 +616,17 @@ class TelegramUploader:
         text = text.replace('&ndash;', '-')
         text = text.replace('&laquo;', '"')
         text = text.replace('&raquo;', '"')
-        
+
         # Ortiqcha bo'shliqlar
         text = re.sub(r'\s+', ' ', text).strip()
-        
+
         return text
 
     def _hashtag_caption_cleanup(self, caption: str) -> str:
         """Hashtag format uchun maxsus tozalash"""
         if not caption:
             return ""
-        
+
         # Faqat kerakli tozalash - hashtag formatni saqlab qolish
         # 1. HTML entities tozalash
         html_entities = {
@@ -638,7 +641,7 @@ class TelegramUploader:
         caption = re.sub(r'&#x[0-9a-fA-F]+;', '', caption)
 
         # 3. Ortiqcha bo'shliqlar va newline'lar
-        caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline  
+        caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline
         caption = re.sub(r' {2,}', ' ', caption)       # 2+ space → 1 space
 
         # 4. Faqat Telegram uchun xavfli belgilarni olib tashlash
@@ -648,56 +651,6 @@ class TelegramUploader:
             caption = caption.replace(char, '')
 
         return caption.strip()
-
-    def _final_caption_cleanup(self, caption: str) -> str:
-        """Caption ni final tozalash - har qanday HTML qoldiqlarini olib tashlash"""
-        if not caption:
-            return ""
-
-        # 1. Barcha HTML teglarni yana bir bor tozalash
-        caption = re.sub(r'<[^>]*>', '', caption)
-
-        # 2. HTML entities lar
-        html_entities = {
-            '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
-            '&nbsp;': ' ', '&#39;': "'", '&#34;': '"', '&copy;': '©', '&reg;': '®'
-        }
-        for entity, replacement in html_entities.items():
-            caption = caption.replace(entity, replacement)
-
-        # 3. Numeric HTML entities (&#123; formatida)
-        caption = re.sub(r'&#\d+;', '', caption)
-
-        # 4. Hex HTML entities (&#x123; formatida)
-        caption = re.sub(r'&#x[0-9a-fA-F]+;', '', caption)
-
-        # 5. Telegram parse mode conflicts (Worker name'ni saqlab qolish)
-        # Worker emoji va nomini himoya qilish
-        worker_pattern = r'🤖\s+[\w\d_-]+'
-        worker_matches = re.findall(worker_pattern, caption)
-
-        telegram_special = ['*', '_', '`', '[', ']',
-                            '~', '|', '+', '-', '=', '.', '!']
-        for char in telegram_special:
-            caption = caption.replace(char, '')
-
-        # Worker pattern'ni qaytarish
-        for match in worker_matches:
-            caption = re.sub(r'🤖\s*\w+', match, caption, count=1)
-
-        # 6. Multiple spaces va newlines tozalash
-        caption = re.sub(r'\n{3,}', '\n\n', caption)  # 3+ newline → 2 newline
-        caption = re.sub(r' {2,}', ' ', caption)       # 2+ space → 1 space
-
-        # 7. Line boshida va oxirida ortiqcha belgilar
-        lines = caption.split('\n')
-        cleaned_lines = []
-        for line in lines:
-            line = line.strip()
-            if line:  # Bo'sh qatorlarni tashlab ketmaslik
-                cleaned_lines.append(line)
-
-        return '\n'.join(cleaned_lines).strip()
 
     async def _get_telegram_entity(self, group_ref: Optional[str] = None):
         """Telegram entity olish"""

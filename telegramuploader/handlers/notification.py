@@ -1,7 +1,7 @@
 """
 Notification Handler - Telegram xabarlarni yuborish uchun
 """
-from core.config import FILES_GROUP_LINK
+from core.config import FILES_GROUP_LINK, WORKER_NAME
 from utils.logger_core import logger
 from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group, api_id, api_hash
 from telethon import TelegramClient
@@ -119,6 +119,7 @@ class NotificationHandler:
 
         message = (
             f"🚀 <b>Fayl yuklash boshlandi</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -130,6 +131,7 @@ class NotificationHandler:
         """Fayl yuklash tugagani haqida xabar"""
         message = (
             f"✅ <b>Fayl muvaffaqiyatli yuklandi</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -142,6 +144,7 @@ class NotificationHandler:
         """Fayl yuklash muvaffaqiyatsiz bo'lgani haqida xabar"""
         message = (
             f"❌ <b>Fayl yuklash muvaffaqiyatsiz</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}"
@@ -152,6 +155,7 @@ class NotificationHandler:
         """Telegram'ga yuklash muvaffaqiyatli bo'lgani haqida xabar"""
         message = (
             f"🎉 <b>Fayl muvaffaqiyatli yuborildi!</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -164,6 +168,7 @@ class NotificationHandler:
         """Telegram'ga yuklash muvaffaqiyatsiz bo'lgani haqida xabar"""
         message = (
             f"❌ <b>Telegram'ga yuklash muvaffaqiyatsiz!</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -176,6 +181,7 @@ class NotificationHandler:
         """Mavjud fayl ishlatilayotgani haqida xabar"""
         message = (
             f"♻️ <b>Mavjud fayl ishlatiladi</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -188,6 +194,7 @@ class NotificationHandler:
         """Fayl qayta yuklanayotgani haqida xabar"""
         message = (
             f"🔄 <b>Fayl qayta yuklanadi</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"📁 <b>Fayl:</b> {filename}\n"
@@ -200,6 +207,7 @@ class NotificationHandler:
         """Fayl avval yuklangan bo'lgani haqida xabar"""
         message = (
             f"⏭️ <b>Fayl avval yuklangan</b>\n"
+            f"🤖 <b>Bot:</b> {WORKER_NAME}\n"
             f"📄 <b>Nom:</b> {title}\n"
             f"🆔 <b>ID:</b> {file_id}\n"
             f"✅ <b>Qayta yuklash shart emas</b>"
@@ -216,6 +224,7 @@ class NotificationHandler:
 
         message = (
             f"⏳ **PROGRESS UPDATE**\n\n"
+            f"🤖 **Bot:** {WORKER_NAME}\n"
             f"📊 **Holat:** {completed}/{total} ({progress_percent:.1f}%)\n"
             f"🔄 **Joriy fayl:** `{current_file}`\n"
             f"🕐 **Vaqt:** {datetime.now().strftime('%H:%M:%S')}"
@@ -233,6 +242,7 @@ class NotificationHandler:
                         100) if total_files > 0 else 0
         message = (
             f"📊 **BATCH YAKUNLANDI**\n\n"
+            f"🤖 **Bot:** {WORKER_NAME}\n"
             f"📁 **Jami fayllar:** {total_files}\n"
             f"✅ **Muvaffaqiyatli:** {successful}\n"
             f"❌ **Xatolik:** {failed}\n"
