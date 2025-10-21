@@ -1,5 +1,5 @@
 """
-Core FileDownloader - Enhanced with intelligent timeout and retry
+Core FileDownloader - Enhanced with intelligent timeout and retry + Resume Support
 """
 import os
 import asyncio
@@ -14,7 +14,7 @@ from utils.text import clean_title
 
 
 class FileDownloader:
-    """Professional file downloader with intelligent timeout and retry"""
+    """Professional file downloader with intelligent timeout, retry and resume support"""
     
     def __init__(self, base_timeout: int = None, chunk_size: int = 256 * 1024, max_retries: int = 3):
         """
@@ -44,7 +44,7 @@ class FileDownloader:
     async def download_file_with_retry(self, session: aiohttp.ClientSession, semaphore: asyncio.Semaphore,
                            file_url: str, output_path: str, filename: str) -> Optional[int]:
         """
-        Bitta faylni download qilish with retry and intelligent timeout
+        Bitta faylni download qilish with retry and resume support
         
         Returns:
             File size in bytes if successful, None if failed
@@ -52,41 +52,84 @@ class FileDownloader:
         async with semaphore:
             for attempt in range(self.max_retries):
                 try:
-                    # Avval HEAD request bilan file size olish
-                    file_size = await self.get_file_size(session, file_url)
+                    # File info olish (size va resume support)
+                    total_size, resume_supported = await self.get_file_info(session, file_url)
                     
-                    # ⚡ TIMEOUT OLIB TASHLANDI - 4 soat ham bo'lsa kutamiz!
-                    # timeout_seconds = self.calculate_timeout(file_size)
-                    # sock_read_timeout = min(timeout_seconds // 4, 1800)
+                    # Mavjud partial file tekshirish
+                    start_byte = 0
+                    if os.path.exists(output_path):
+                        existing_size = os.path.getsize(output_path)
+                        
+                        if existing_size >= total_size and total_size > 0:
+                            logger.info(f"✅ File already complete: {filename} ({existing_size} bytes)")
+                            return existing_size
+                        
+                        if resume_supported and existing_size > 0:
+                            start_byte = existing_size
+                            logger.info(f"🔄 Resuming download from {start_byte/1024/1024:.2f} MB: {filename}")
+                        else:
+                            # Resume qo'llab-quvvatlanmasa, qayta boshlash
+                            if existing_size > 0:
+                                logger.info(f"🗑️ Removing partial file (no resume support): {filename}")
+                                os.remove(output_path)
                     
+                    # Timeout settings - unlimited
                     timeout = aiohttp.ClientTimeout(
-                        total=None,          # ✅ Total timeout yo'q - cheksiz
-                        connect=60,          # Connection timeout 1 minute (tez)
-                        sock_read=None       # ✅ Socket read timeout yo'q - cheksiz
+                        total=None,          # Total timeout yo'q - cheksiz
+                        connect=60,          # Connection timeout 1 minute
+                        sock_read=None       # Socket read timeout yo'q - cheksiz
                     )
                     
-                    size_mb = file_size / (1024 * 1024) if file_size else 0
+                    size_mb = total_size / (1024 * 1024) if total_size else 0
                     
                     if attempt > 0:
                         logger.info(f"🔄 Retry {attempt + 1}/{self.max_retries}: {filename}")
                     
                     logger.info(f"⬇️ Downloading: {filename} ({size_mb:.2f} MB)")
+                    if start_byte > 0:
+                        logger.info(f"📍 Resume from: {start_byte/1024/1024:.2f} MB")
                     logger.info(f"⚡ Timeout REMOVED - unlimited download time!")
                     
-                    async with session.get(file_url, timeout=timeout) as resp:
-                        if resp.status != 200:
+                    # Headers setup
+                    headers = {}
+                    if start_byte > 0 and resume_supported:
+                        headers["Range"] = f"bytes={start_byte}-"
+                    
+                    async with session.get(file_url, headers=headers, timeout=timeout) as resp:
+                        # Status code tekshirish
+                        expected_status = 206 if start_byte > 0 else 200
+                        if resp.status not in [200, 206]:
                             logger.error(f"❌ HTTP {resp.status}: {file_url}")
                             if attempt == self.max_retries - 1:
                                 return None
                             continue
                         
                         # Response'dan actual size
-                        actual_total_size = int(resp.headers.get("Content-Length", file_size or 0))
+                        if resp.status == 206:
+                            # Partial content - Content-Range header'dan size olish
+                            content_range = resp.headers.get("Content-Range", "")
+                            if content_range:
+                                # Format: "bytes start-end/total"
+                                total_from_range = content_range.split("/")[-1]
+                                if total_from_range.isdigit():
+                                    actual_total_size = int(total_from_range)
+                                else:
+                                    actual_total_size = total_size
+                            else:
+                                actual_total_size = total_size
+                        else:
+                            actual_total_size = int(resp.headers.get("Content-Length", total_size or 0))
+                        
+                        # File mode - append agar resume, yoqsa yangi
+                        file_mode = "ab" if start_byte > 0 else "wb"
                         
                         # Faylni download qilish
-                        with open(output_path, "wb") as f:
+                        with open(output_path, file_mode) as f:
+                            # Progress bar setup
+                            remaining_bytes = actual_total_size - start_byte
                             with tqdm(
-                                total=actual_total_size,
+                                total=remaining_bytes,
+                                initial=0,
                                 unit="B",
                                 unit_scale=True,
                                 desc=f"⬇️ {filename[:30]}"
@@ -112,9 +155,15 @@ class FileDownloader:
                         logger.error(f"❌ Final error after {self.max_retries} attempts: {filename}")
                         return None
                     
-                    # Cleanup partial file
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
+                    # Partial file'ni saqlab qolish (resume uchun)
+                    # Faqat kritik xatoliklarda o'chirish
+                    if "Connection" in str(e) or "Timeout" in str(e):
+                        logger.info(f"💾 Keeping partial file for resume: {output_path}")
+                    else:
+                        # Boshqa xatoliklarda o'chirish
+                        if os.path.exists(output_path):
+                            os.remove(output_path)
+                            logger.info(f"🗑️ Removed corrupted partial file: {output_path}")
                     
                     # Exponential backoff
                     wait_time = 2 ** attempt
@@ -150,6 +199,51 @@ class FileDownloader:
         except Exception as e:
             logger.debug(f"🔍 HEAD request failed: {e}")
             return 0
+
+    async def check_resume_support(self, session: aiohttp.ClientSession, file_url: str) -> bool:
+        """
+        Server resume qo'llab-quvvatlaydimi tekshirish
+        
+        Args:
+            session: aiohttp session
+            file_url: File URL
+            
+        Returns:
+            True if resume supported, False otherwise
+        """
+        try:
+            timeout = aiohttp.ClientTimeout(total=30)
+            headers = {"Range": "bytes=0-0"}  # Test range request
+            async with session.get(file_url, headers=headers, timeout=timeout) as resp:
+                # 206 Partial Content yoki Accept-Ranges header mavjudligi
+                return resp.status == 206 or "bytes" in resp.headers.get("Accept-Ranges", "")
+        except Exception as e:
+            logger.warning(f"⚠️ Resume support check failed: {e}")
+            return False
+
+    async def get_file_info(self, session: aiohttp.ClientSession, file_url: str) -> Tuple[int, bool]:
+        """
+        File haqida ma'lumot olish (size va resume support)
+        
+        Args:
+            session: aiohttp session
+            file_url: File URL
+            
+        Returns:
+            Tuple[file_size, resume_supported]
+        """
+        try:
+            # Head request bilan file size olish
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with session.head(file_url, timeout=timeout) as resp:
+                if resp.status == 200:
+                    file_size = int(resp.headers.get("Content-Length", 0))
+                    resume_supported = "bytes" in resp.headers.get("Accept-Ranges", "")
+                    return file_size, resume_supported
+                return 0, False
+        except Exception as e:
+            logger.warning(f"⚠️ Get file info failed: {e}")
+            return 0, False
 
     def prepare_download_path(self, title: str, file_url: str, download_dir: str) -> Tuple[str, str]:
         """
