@@ -461,13 +461,26 @@ class TelegramUploader:
                     if isinstance(cat, (int, str)):
                         try:
                             cat_num = int(cat)
-                            category_ids.append(str(cat_num))
+                            category_ids.append(str(cat_num))  # ✅ ID ham qo'shiladi
                             if cat_num in CATEGORY_MAP:
                                 category_names.append(CATEGORY_MAP[cat_num])
                             else:
                                 category_names.append(f"category_{cat_num}")
                         except ValueError:
+                            # Agar raqam bo'lmasa, faqat nomini qo'shamiz
                             category_names.append(str(cat))
+            else:
+                # Agar categories boshqa tur bo'lsa (int, None, etc.)
+                if categories:
+                    try:
+                        cat_num = int(categories)
+                        category_ids.append(str(cat_num))
+                        if cat_num in CATEGORY_MAP:
+                            category_names.append(CATEGORY_MAP[cat_num])
+                        else:
+                            category_names.append(f"category_{cat_num}")
+                    except (ValueError, TypeError):
+                        category_names.append(str(categories))
 
             # Caption yaratish - hashtag parameter formatida
             caption_parts = []
