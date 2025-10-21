@@ -345,7 +345,7 @@ class TelegramUploader:
 
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
-
+            logger.info(f"📜 Caption: {caption}")
             # 📌 Telegram connection va entity olish
             entity = await self._get_telegram_entity(group_ref)
             if not entity:
@@ -427,114 +427,116 @@ class TelegramUploader:
             return False
 
     async def _create_caption(self, item: Dict[str, Any], size: int) -> str:
-        """Caption yaratish - HTML-siz oddiy matn formatida"""
-        # logger.info("🔍 Caption yaratish boshlandi")
-        logo = item.get("image", None)
-        # logo ni faqat to'g'ri URL bo'lsa yoki data:image emas va None emas bo'lsa qo'shamiz
-        if (
-            not logo
-            or not isinstance(logo, str)
-            or logo.strip() == ""
-            or logo.startswith("data:image")
-        ):
-            logo = None
+        """Caption yaratish - hashtag parameter formatida"""
         try:
             # Categories ni to'g'ri formatda olish
-            categories = item.get("categories", [])
-            # Agar string bo'lsa, uni split qilamiz yoki list sifatida qoldiramiz
-            if isinstance(categories, str):
-                # Agar vergul bilan ajratilgan bo'lsa
-                categories = [cat.strip()
-                              for cat in categories.split(",") if cat.strip()]
-            elif not isinstance(categories, list):
-                categories = []
+            from core.catigories import CATEGORY_MAP
 
-            # Caption yaratish - oddiy matn formatida (HTML-siz)
+            categories = item.get("categories", [])
+            category_names = []
+            category_id = ""
+
+            # Agar string bo'lsa, uni split qilamiz
+            if isinstance(categories, str):
+                # Agar vergul bilan ajratilgan raqamlar bo'lsa: "1,5,20"
+                category_ids = [cat.strip()
+                                for cat in categories.split(",") if cat.strip()]
+                for cat_id in category_ids:
+                    try:
+                        # String raqamni int ga aylantirish
+                        cat_num = int(cat_id)
+                        # CATEGORY_MAP dan nom topish
+                        if cat_num in CATEGORY_MAP:
+                            category_names.append(CATEGORY_MAP[cat_num])
+                            if not category_id:  # Birinchi category_id ni olish
+                                category_id = str(cat_num)
+                        else:
+                            # Agar raqam yo'q bo'lsa, raqamni o'zini qo'shamiz
+                            category_names.append(f"category_{cat_num}")
+                            if not category_id:
+                                category_id = str(cat_num)
+                    except ValueError:
+                        # Agar raqam emas bo'lsa, matnni o'zini qo'shamiz
+                        category_names.append(cat_id)
+            elif isinstance(categories, list):
+                # Agar list bo'lsa, har bir elementni tekshiramiz
+                for cat in categories:
+                    if isinstance(cat, (int, str)):
+                        try:
+                            cat_num = int(cat)
+                            if cat_num in CATEGORY_MAP:
+                                category_names.append(CATEGORY_MAP[cat_num])
+                                if not category_id:
+                                    category_id = str(cat_num)
+                            else:
+                                category_names.append(f"category_{cat_num}")
+                                if not category_id:
+                                    category_id = str(cat_num)
+                        except ValueError:
+                            category_names.append(str(cat))
+
+            # Caption yaratish - hashtag parameter formatida
             caption_parts = []
 
             # Title
             title = self._clean_text_for_caption(item.get("title", "No title"))
-            caption_parts.append(f"📄 {title}")
-
-            # Categories (hashtag ko'rinishida)
-            if categories:
-                clean_categories = [self._clean_text_for_caption(
-                    cat) for cat in categories]
-                # Kategoriyalarni hashtag formatida chiqarish
-                hashtag_categories = []
-                for cat in clean_categories:
-                    # Hashtag uchun maxsus belgilarni tozalash
-                    hashtag_text = cat.replace(' ', '_').replace(
-                        '&', 'and').replace('/', '_').replace('-', '_')
-                    hashtag_text = hashtag_text.replace(
-                        '(', '').replace(')', '').replace(',', '_')
-                    hashtag_text = hashtag_text.lower().strip('_')
-                    # Ko'p underscore larni bitta qilish
-                    while '__' in hashtag_text:
-                        hashtag_text = hashtag_text.replace('__', '_')
-                    if hashtag_text:
-                        hashtag_categories.append(f"#{hashtag_text}")
-                caption_parts.append(f"🏷️ {' '.join(hashtag_categories)}")
-
-            # Year and Country
-            year = item.get("year", "")
-            country = item.get("country", "")
-            if year or country:
-                year_country = []
-                if year:
-                    year_country.append(str(year))
-                if country:
-                    year_country.append(self._clean_text_for_caption(country))
-                caption_parts.append(f"📅 {' | '.join(year_country)}")
-
-            # Actors
-            actors = item.get("actors", "")
-            if actors:
-                clean_actors = self._clean_text_for_caption(actors)
-                caption_parts.append(f"🎭 {clean_actors}")
+            caption_parts.append(f"#title={title}")
 
             # Language
             language = item.get("language", "")
             if language:
                 clean_language = self._clean_text_for_caption(language)
-                caption_parts.append(f"🌐 {clean_language}")
+                caption_parts.append(f"#lang={clean_language}")
 
-            # File size
-            caption_parts.append(f"💾 {format_file_size(size)}")
+            # Category ID (birinchi kategoriya ID si)
+            if category_id:
+                caption_parts.append(f"#category_id={category_id}")
 
-            # Worker name (ko'p worker ishlayotganda ajratib olish uchun)
-            caption_parts.append(f"🤖 {WORKER_NAME}")
+            # Actors
+            actors = item.get("actors", "")
+            if actors:
+                clean_actors = self._clean_text_for_caption(actors)
+                caption_parts.append(f"#actors={clean_actors}")
 
-            # Description (qisqartirilgan)
+            # Year
+            year = item.get("year", "")
+            if year:
+                caption_parts.append(f"#year={year}")
+
+            # Country
+            country = item.get("country", "")
+            if country:
+                clean_country = self._clean_text_for_caption(country)
+                caption_parts.append(f"#country={clean_country}")
+
+            # Categories (birinchi kategoriya nomi)
+            if category_names:
+                caption_parts.append(f"#categories={category_names[0]}")
+
+            # File size (bytes)
+            caption_parts.append(f"#file_size={size}")
+
+            # URL
+            url = item.get("file_url", "")
+            if url:
+                caption_parts.append(f'#url="{url}"')
+
+            # Description
             description = item.get("description", "")
             if description:
                 clean_desc = self._clean_text_for_caption(description)
-                if len(clean_desc) > 200:
-                    clean_desc = clean_desc[:197] + "..."
-                caption_parts.append(f"📝 {clean_desc}")
-
-            # URL (agar kerak bo'lsa) - URL ni clean qilmaslik uchun oxirida qo'shamiz
-            url = item.get("file_url", "")
+                caption_parts.append(f"#desc={clean_desc}")
 
             caption = "\n".join(caption_parts)
-
-            # Final tozalash - URL qo'shilishidan oldin (URL ni himoya qilish uchun)
-            caption = self._final_caption_cleanup(caption)
-
-            # URL ni clean qilingan caption ga qo'shish
-            if url and len(url) < 100:  # Faqat qisqa URL larni qo'shamiz
-                caption += f"\n🔗 {url}"
-
             caption = caption[:4096]  # Telegram limit
-            # logger.info("✅ Caption yaratildi (HTML-siz)")
-            # logger.info(f"📝 Caption uzunligi: {len(caption)} belgi")
+
             return caption
 
         except Exception as caption_error:
             logger.error(f"❌ Caption yaratishda xato: {caption_error}")
             clean_title = self._clean_text_for_caption(
                 item.get('title', 'No title'))
-            return f"📄 {clean_title}\n💾 {format_file_size(size)}"
+            return f"#title={clean_title}\n#file_size={size}"
 
     def _clean_text_for_caption(self, text: str) -> str:
         """Caption uchun matnni tozalash - butunlay HTML-siz (Enhanced)"""

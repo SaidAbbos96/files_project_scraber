@@ -1,3 +1,4 @@
+import asyncio
 from utils.logger_core import logger
 from telethon import TelegramClient
 import sys
@@ -22,13 +23,12 @@ current_dir = Path(__file__).parent.parent  # telegramuploader/
 session_path = current_dir / f"session_{phone}.session"
 
 # Session lock conflict ni oldini olish uchun connection parametrlari
-import asyncio
 _session_lock = asyncio.Lock()
 
 # SQLite timeout bilan Telegram client
 Telegram_client = TelegramClient(
-    str(session_path), 
-    api_id, 
+    str(session_path),
+    api_id,
     api_hash,
     connection_retries=3,
     retry_delay=2,
@@ -81,6 +81,7 @@ async def safe_telegram_start():
         except Exception as e:
             logger.error(f"❌ Telegram start xato: {e}")
             return False
+
 
 async def resolve_group(group_ref: str):
     """

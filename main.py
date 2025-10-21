@@ -14,6 +14,339 @@ from utils.system_diagnostics import SystemDiagnostics
 from scripts.session_management.session_manager import SessionManager
 
 
+async def test_upload_demo():
+    """Test Upload Demo - Berilgan URL dan fayl yuklab, Telegram'ga yuborish"""
+    logger.info("🧪 Test Upload Demo")
+    logger.info("=" * 60)
+    
+    # Demo URL
+    demo_url = "https://videocdn.cdnpk.net/videos/63eef08b-9d49-401c-b357-2bc259bdeebd/horizontal/downloads/720p.mp4?filename=1472728_People_Business_1280x720.mp4&token=exp=1761025908~hmac=826fbb5931aaad2d89665a12f60211691a94aba9cc07c3e26aa388215e77bc37"
+    
+    logger.info(f"🔗 Demo URL: {demo_url[:100]}...")
+    
+    # Demo file item yaratish
+    demo_item = {
+        "title": "Test Demo Video - People Business 1280x720",
+        "categories": ["demo", "business", "people"],
+        "year": "2024",
+        "country": "Test Country",
+        "actors": "Demo Actor One, Demo Actor Two, Demo Actor Three",
+        "language": "en",
+        "description": "Bu test uchun demo video. Business people working in office environment. High quality 720p demonstration video for testing upload functionality and caption generation.",
+        "file_url": demo_url,
+        "file_page": "https://example.com/demo/test-page",
+        "image": "https://example.com/demo/thumbnail.jpg"
+    }
+    
+    logger.info("📋 Demo Item Ma'lumotlari:")
+    logger.info(f"📄 Title: {demo_item['title']}")
+    logger.info(f"🏷️ Categories: {demo_item['categories']}")
+    logger.info(f"📅 Year: {demo_item['year']}")
+    logger.info(f"🌍 Country: {demo_item['country']}")
+    logger.info(f"🎭 Actors: {demo_item['actors']}")
+    logger.info(f"🌐 Language: {demo_item['language']}")
+    logger.info(f"📝 Description: {demo_item['description'][:100]}...")
+    
+    # Test options
+    logger.info("\n🎮 Test rejimini tanlang:")
+    logger.info("[1] Faqat caption test (fayl yuklanmaydi)")
+    logger.info("[2] To'liq test (fayl yuklab, Telegram'ga yuborish)")
+    logger.info("[3] Download test (faqat lokalga yuklash)")
+    logger.info("[back] Orqaga qaytish")
+    
+    test_choice = safe_input("Test rejimini tanlang → ")
+    
+    if test_choice == "1":
+        await test_caption_only(demo_item)
+    elif test_choice == "2":
+        await test_full_upload(demo_item, demo_url)
+    elif test_choice == "3":
+        await test_download_only(demo_item, demo_url)
+    elif test_choice.lower() == "back":
+        return
+    else:
+        logger.info("❌ Noto'g'ri tanlov!")
+
+
+async def test_caption_only(demo_item):
+    """Faqat caption yaratishni test qilish"""
+    logger.info("\n🧪 Caption Test Boshlandi")
+    logger.info("=" * 50)
+    
+    try:
+        # TelegramUploader import
+        from telegramuploader.core.uploader import TelegramUploader
+        
+        uploader = TelegramUploader()
+        
+        # Demo file size (100 MB)
+        demo_size = 100 * 1024 * 1024  # Bytes da 100 MB
+        
+        # Caption yaratish
+        logger.info("📝 Caption yaratilmoqda...")
+        caption = await uploader._create_caption(demo_item, demo_size)
+        
+        logger.info("✅ Caption yaratildi!")
+        logger.info("\n📄 Generated Caption:")
+        logger.info("=" * 60)
+        print(caption)  # Rang va formatni saqlab qolish uchun print
+        logger.info("=" * 60)
+        
+        # Caption tahlili
+        lines = caption.split('\n')
+        logger.info(f"\n📊 Caption Statistics:")
+        logger.info(f"   📏 Uzunlik: {len(caption)} belgi")
+        logger.info(f"   📄 Qatorlar soni: {len(lines)}")
+        logger.info(f"   📋 Telegram limit: {'✅ OK' if len(caption) <= 4096 else '❌ Limit oshib ketdi'}")
+        
+        # Hashtag tekshirish
+        hashtag_count = caption.count('#')
+        logger.info(f"   🏷️ Hashtag soni: {hashtag_count}")
+        
+        # URL tekshirish
+        url_found = "🔗" in caption
+        logger.info(f"   🔗 URL mavjud: {'✅' if url_found else '❌'}")
+        
+        # Worker name tekshirish
+        worker_found = "🤖" in caption
+        logger.info(f"   🤖 Worker name: {'✅' if worker_found else '❌'}")
+        
+        logger.info("\n✅ Caption test yakunlandi!")
+        
+    except Exception as e:
+        logger.error(f"❌ Caption test da xato: {e}")
+
+
+async def test_download_only(demo_item, demo_url):
+    """Faqat fayl yuklab olishni test qilish"""
+    logger.info("\n⬇️ Download Test Boshlandi")
+    logger.info("=" * 50)
+    
+    try:
+        import aiohttp
+        import aiofiles
+        import os
+        from pathlib import Path
+        
+        # Download directory
+        download_dir = Path("downloads/test_demo")
+        download_dir.mkdir(parents=True, exist_ok=True)
+        
+        # File name
+        filename = "demo_test_video.mp4"
+        file_path = download_dir / filename
+        
+        logger.info(f"📁 Download path: {file_path}")
+        logger.info(f"🔗 URL: {demo_url[:100]}...")
+        
+        # Download process
+        logger.info("⬇️ Yuklab olish boshlandi...")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(demo_url) as response:
+                if response.status == 200:
+                    total_size = int(response.headers.get('content-length', 0))
+                    logger.info(f"📏 Fayl hajmi: {total_size / (1024*1024):.1f} MB")
+                    
+                    downloaded = 0
+                    async with aiofiles.open(file_path, 'wb') as f:
+                        async for chunk in response.content.iter_chunked(8192):
+                            await f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            # Progress har 1MB da
+                            if downloaded % (1024*1024) == 0:
+                                progress = (downloaded / total_size) * 100 if total_size > 0 else 0
+                                logger.info(f"📊 Progress: {progress:.1f}% ({downloaded / (1024*1024):.1f} MB)")
+                    
+                    logger.info(f"✅ Fayl muvaffaqiyatli yuklandi: {file_path}")
+                    logger.info(f"📏 Final hajm: {os.path.getsize(file_path) / (1024*1024):.1f} MB")
+                    
+                else:
+                    logger.error(f"❌ HTTP xato: {response.status}")
+                    
+    except Exception as e:
+        logger.error(f"❌ Download test da xato: {e}")
+
+
+async def test_full_upload(demo_item, demo_url):
+    """To'liq test - download va upload"""
+    logger.info("\n🚀 Full Upload Test Boshlandi")
+    logger.info("=" * 50)
+    
+    try:
+        # 1. Download test
+        await test_download_only(demo_item, demo_url)
+        
+        # 2. Caption test
+        await test_caption_only(demo_item)
+        
+        # 3. Telegram upload simulation
+        logger.info("\n📤 Telegram Upload Simulation")
+        logger.info("=" * 50)
+        
+        from pathlib import Path
+        file_path = Path("downloads/test_demo/demo_test_video.mp4")
+        
+        if file_path.exists():
+            logger.info(f"📁 Local fayl topildi: {file_path}")
+            logger.info(f"📏 Hajm: {file_path.stat().st_size / (1024*1024):.1f} MB")
+            
+            # Telegram uploader import
+            from telegramuploader.core.uploader import TelegramUploader
+            
+            uploader = TelegramUploader()
+            
+            # Demo upload (actual upload emas, faqat test)
+            logger.info("📤 Telegram upload tayyorligi...")
+            
+            # Video attributes test
+            video_attrs = uploader.get_video_attributes(str(file_path))
+            if video_attrs:
+                logger.info(f"📹 Video attributes: {video_attrs.w}x{video_attrs.h}, {video_attrs.duration}s")
+            else:
+                logger.info("📹 Video attributes olinmadi (FFmpeg kerak)")
+                
+            # Caption yaratish
+            demo_size = file_path.stat().st_size
+            caption = await uploader._create_caption(demo_item, demo_size)
+            
+            logger.info("✅ Upload tayyorligi yakunlandi!")
+            logger.info("ℹ️ Haqiqiy Telegram upload uchun telegramuploader modulidan foydalaning")
+            
+        else:
+            logger.error("❌ Local fayl topilmadi, upload imkonsiz")
+            
+    except Exception as e:
+        logger.error(f"❌ Full upload test da xato: {e}")
+
+
+async def test_message_demo():
+    """Test Message Demo - DB'dan video ma'lumotlarini Telegram'ga text message yuborish"""
+    logger.info("📝 Test Message Demo")
+    logger.info("=" * 60)
+    
+    try:
+        # Database dan fayllarni olish
+        db = FileDB()
+        
+        # Mavjud site'larni ko'rsatish
+        logger.info("📋 Mavjud site'lar:")
+        configs_list = list(SITE_CONFIGS.keys())
+        for i, name in enumerate(configs_list, start=1):
+            files_count = db.get_files_count(name)
+            logger.info(f"[{i}] {name} ({files_count} ta fayl)")
+        
+        if not any(db.get_files_count(name) > 0 for name in configs_list):
+            logger.info("❌ Database'da hech qanday fayl yo'q!")
+            logger.info("💡 Avval scraping qiling yoki test data qo'shing")
+            return
+        
+        # Site tanlash
+        site_choice = safe_input("Site'ni tanlang (raqam) → ")
+        
+        if not site_choice.isdigit() or not (1 <= int(site_choice) <= len(configs_list)):
+            logger.info("❌ Noto'g'ri tanlov!")
+            return
+        
+        site_name = configs_list[int(site_choice) - 1]
+        files = db.get_files(site_name)
+        
+        if not files:
+            logger.info(f"❌ {site_name} da fayllar yo'q!")
+            return
+        
+        # Video tanlash
+        logger.info(f"\n📋 {site_name} da mavjud videolar:")
+        for i, file in enumerate(files[:10], start=1):  # Birinchi 10 ta
+            title = file.get('title', 'No title')
+            if len(title) > 50:
+                title = title[:47] + "..."
+            logger.info(f"[{i}] {title}")
+        
+        if len(files) > 10:
+            logger.info(f"... va yana {len(files) - 10} ta video")
+        
+        video_choice = safe_input(f"Video'ni tanlang (1-{min(10, len(files))}) → ")
+        
+        if not video_choice.isdigit() or not (1 <= int(video_choice) <= min(10, len(files))):
+            logger.info("❌ Noto'g'ri tanlov!")
+            return
+        
+        selected_file = files[int(video_choice) - 1]
+        
+        # Caption yaratish
+        logger.info(f"\n📝 Tanlangan video: {selected_file.get('title', 'No title')}")
+        logger.info("📝 Caption yaratilmoqda...")
+        
+        from telegramuploader.core.uploader import TelegramUploader
+        uploader = TelegramUploader()
+        
+        # Fayl hajmini aniqlash
+        file_size = selected_file.get('file_size', 0)
+        if not file_size:
+            file_size = 100 * 1024 * 1024  # Default 100 MB
+        
+        caption = await uploader._create_caption(selected_file, file_size)
+        
+        logger.info("✅ Caption yaratildi!")
+        logger.info("\n📄 Generated Caption:")
+        logger.info("=" * 60)
+        print(caption)  # Rang va formatni saqlab qolish uchun print
+        logger.info("=" * 60)
+        
+        # Telegram'ga yuborish taklifi
+        send_choice = safe_input("\nTelegram'ga yuborishni xohlaysizmi? (y/n): ", "n").lower()
+        
+        if send_choice in ['y', 'yes', 'ha']:
+            await send_text_message_to_telegram(caption)
+        else:
+            logger.info("📝 Caption faqat ko'rsatildi, yuborilmadi")
+            
+    except Exception as e:
+        logger.error(f"❌ Test message demo da xato: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def send_text_message_to_telegram(message: str):
+    """Text message'ni Telegram'ga yuborish"""
+    logger.info("📤 Telegram'ga yuborilmoqda...")
+    
+    try:
+        from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
+        from core.config import FILES_GROUP_ID
+        
+        # Telegram client start qilish
+        await Telegram_client.start()
+        
+        # Group resolve qilish
+        group_entity = await resolve_group(FILES_GROUP_ID)
+        if not group_entity:
+            logger.error("❌ Telegram group topilmadi")
+            return
+        
+        # Text message yuborish
+        logger.info(f"📝 Message uzunligi: {len(message)} belgi")
+        
+        result = await Telegram_client.send_message(
+            entity=group_entity,
+            message=message,
+            parse_mode=None  # HTML yoki Markdown parsing yo'q, oddiy text
+        )
+        
+        if result:
+            logger.info("✅ Message muvaffaqiyatli yuborildi!")
+            logger.info(f"📊 Message ID: {result.id}")
+        else:
+            logger.error("❌ Message yuborilmadi")
+            
+    except Exception as e:
+        logger.error(f"❌ Telegram'ga yuborishda xato: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def safe_input(prompt: str, default: str = "") -> str:
     """Xavfsiz input - automated testing uchun"""
     try:
@@ -44,6 +377,8 @@ async def main():
     # Special options without config
     logger.info("\n🔧 Sistema rejimlar:")
     logger.info("[info] System Diagnostics")
+    logger.info("[test-upload] Test Upload - Demo fayl yuklash")
+    logger.info("[test-message] Test Message - DB dan video info yuborish")
     logger.info("[clear-cache] Downloads papkasini tozalash")
     logger.info("[clear-db] Database faylini tozalash")
     logger.info("[fix-session] Telegram session lock muammosini hal qilish")
@@ -71,6 +406,14 @@ async def main():
                 "⚠️ Ba'zi muammolar topildi. system_diagnostics_report.txt faylini ko'ring.")
 
         logger.info("🎉 System Diagnostics yakunlandi!")
+        return
+
+    elif choice.lower() == "test-upload":
+        await test_upload_demo()
+        return
+
+    elif choice.lower() == "test-message":
+        await test_message_demo()
         return
 
     elif choice.lower() == "clear-cache":
