@@ -74,6 +74,11 @@ APP_CONFIG = {
     # --- Streaming Settings - Environment'dan o'qiladi ---
     "use_streaming_upload": os.getenv("USE_STREAMING_UPLOAD", "false").lower() in ("true", "1", "yes"),
     "keep_files_on_disk": os.getenv("KEEP_FILES_ON_DISK", "false").lower() in ("true", "1", "yes"),
+
+    # --- Bot API upload ---
+    "use_bot_api_upload": os.getenv("USE_BOT_API_UPLOAD", "false").lower() in ("true", "1", "yes"),
+    "bot_api_token": os.getenv("BOT_API_TOKEN", None),
+    "bot_api_chat_id": os.getenv("BOT_API_CHAT_ID", None),
 }
 
 MAX_SIZE_BYTES = 4 * 1024 * 1024 * 1024  # 4GB

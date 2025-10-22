@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 from telethon.tl.types import DocumentAttributeVideo
 from tqdm.asyncio import tqdm
 
-from core.config import FILES_GROUP_LINK, WORKER_NAME
+from core.config import FILES_GROUP_ID, FILES_GROUP_LINK, WORKER_NAME
 from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
 from telegramuploader.utils.diagnostics import diagnostics
 from utils.helpers import format_file_size
@@ -346,6 +346,36 @@ class TelegramUploader:
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
 
+            # --- BOT API URL UPLOAD LOGIC ---
+            # If enabled, try to send via bot API (URL) if file size <= 2GB and file_url exists
+            use_bot_api = config.get("use_bot_api_upload", False)
+            bot_token = config.get("bot_api_token")
+            bot_chat_id = config.get("bot_api_chat_id") or FILES_GROUP_ID
+            file_url = item.get("file_url")
+            size2GB = 2 * 1024 * 1024 * 1024
+            if use_bot_api and bot_token and bot_chat_id and file_url and size <= size2GB:
+                try:
+                    from telegramuploader.utils.bot_api import send_file_by_url_via_bot
+                    is_video = self.is_video_file(filename)
+                    bot_result = send_file_by_url_via_bot(
+                        token=bot_token,
+                        chat_id=bot_chat_id,
+                        file_url=file_url,
+                        caption=caption,
+                        as_video=is_video
+                    )
+                    if bot_result.get("ok"):
+                        logger.info(f"✅ BOT API orqali yuborildi: {filename}")
+                        diagnostics.log_success(
+                            filename, time.time() - start_time)
+                        return True
+                    else:
+                        logger.warning(
+                            f"⚠️ BOT API orqali yuborib bo'lmadi: {bot_result}")
+                except Exception as bot_api_error:
+                    logger.warning(
+                        f"⚠️ BOT API upload xatolik: {bot_api_error}")
+
             # logger.info(f"📜 Caption: {caption}")
             # 📌 Telegram connection va entity olish
             entity = await self._get_telegram_entity(group_ref)
@@ -459,13 +489,16 @@ class TelegramUploader:
                         category_names.append(category_name)
                         # Nom orqali ID topish
                         if category_name in CATEGORY_NAME_TO_ID:
-                            category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                            category_ids.append(
+                                str(CATEGORY_NAME_TO_ID[category_name]))
                         else:
                             # Agar nom topilmasa ham, default ID berish
-                            logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                            logger.warning(
+                                f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
                             # Default 'other' category ID (1) berish
                             if 'other' in CATEGORY_NAME_TO_ID:
-                                category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
+                                category_ids.append(
+                                    str(CATEGORY_NAME_TO_ID['other']))
             elif isinstance(categories, list):
                 # Agar list bo'lsa, har bir elementni tekshiramiz
                 for cat in categories:
@@ -484,12 +517,15 @@ class TelegramUploader:
                             category_names.append(category_name)
                             # Nom orqali ID topish
                             if category_name in CATEGORY_NAME_TO_ID:
-                                category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                                category_ids.append(
+                                    str(CATEGORY_NAME_TO_ID[category_name]))
                             else:
-                                logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                                logger.warning(
+                                    f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
                                 # Default 'other' category ID berish
                                 if 'other' in CATEGORY_NAME_TO_ID:
-                                    category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
+                                    category_ids.append(
+                                        str(CATEGORY_NAME_TO_ID['other']))
             else:
                 # Agar categories boshqa tur bo'lsa (int, None, etc.)
                 if categories:
@@ -506,12 +542,15 @@ class TelegramUploader:
                         category_names.append(category_name)
                         # Nom orqali ID topish
                         if category_name in CATEGORY_NAME_TO_ID:
-                            category_ids.append(str(CATEGORY_NAME_TO_ID[category_name]))
+                            category_ids.append(
+                                str(CATEGORY_NAME_TO_ID[category_name]))
                         else:
-                            logger.warning(f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
+                            logger.warning(
+                                f"🔍 CATEGORY WARNING: '{category_name}' ID topilmadi")
                             # Default 'other' category ID berish
                             if 'other' in CATEGORY_NAME_TO_ID:
-                                category_ids.append(str(CATEGORY_NAME_TO_ID['other']))
+                                category_ids.append(
+                                    str(CATEGORY_NAME_TO_ID['other']))
 
             # Caption yaratish - hashtag parameter formatida
             caption_parts = []
