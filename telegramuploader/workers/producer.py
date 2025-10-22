@@ -53,15 +53,16 @@ class FileProducer:
             size, file_needs_download = await self._check_existing_file(file_path, url_size, file_info)
 
             # 4. Download qilish (agar kerak bo'lsa)
+            size_2gb = 2 * 1024 * 1024 * 1024
             if file_needs_download:
-                if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+                if size and TELEGRAM_USER_IS_PREMIUM is False and size > size_2gb:
                     logger.warning(f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({size} bytes) 2GB dan katta, yuklab olinmaydi!")
                     return
                 size = await self._download_file(session, semaphore, file_info, file_path, url_size, config)
                 # 2GB limit for non-premium
                 if not size:
                     return
-                if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+                if TELEGRAM_USER_IS_PREMIUM is False and size > size_2gb:
                     logger.warning(f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({size} bytes) 2GB dan katta, yuklab olinmaydi!")
                     return
 
