@@ -343,6 +343,13 @@ class TelegramUploader:
                     pass
                     # logger.info(f"✅ Video validation passed: {reason}")
 
+            # --- PREMIUM LIMIT CHECK ---
+            from telegramuploader.telegram.telegram_client import TELEGRAM_IS_PREMIUM
+            if TELEGRAM_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+                logger.warning(f"⏭️ Premium emas: {filename} ({size} bytes) 2GB dan katta, o'tkazib yuborildi!")
+                diagnostics.log_error(filename, size, "Not premium, skipped", "File >2GB, not premium", 0)
+                return False
+
             # 📌 Caption yaratish
             caption = await self._create_caption(item, size)
 

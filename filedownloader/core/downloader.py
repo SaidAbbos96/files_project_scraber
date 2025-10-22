@@ -337,20 +337,34 @@ class FileDownloader:
             
             # Create download tasks
             tasks = []
+            from telegramuploader.telegram.telegram_client import TELEGRAM_IS_PREMIUM
             for file_info in files_data:
                 file_url = file_info.get('file_url')
                 if not file_url:
                     continue
-                
+
+                # File size check (if available)
+                file_size = file_info.get('size') or file_info.get('file_size')
+                if file_size is not None:
+                    try:
+                        file_size = int(file_size)
+                    except Exception:
+                        file_size = None
+
+                # 2GB limit for non-premium
+                if TELEGRAM_IS_PREMIUM is False and file_size is not None and file_size > 2 * 1024 * 1024 * 1024:
+                    logger.warning(f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({file_size} bytes) 2GB dan katta, yuklab olinmaydi!")
+                    continue
+
                 title = clean_title(file_info.get('title', 'unknown'))
                 filename = safe_filename(f"{title}_{file_info.get('id', 'unknown')}")
                 output_path = os.path.join(download_dir, filename)
-                
+
                 # Skip if already exists
                 if os.path.exists(output_path):
                     logger.info(f"⏭️ Skipping existing: {filename}")
                     continue
-                
+
                 task = self.download_file(session, semaphore, file_url, output_path, filename)
                 tasks.append(task)
             

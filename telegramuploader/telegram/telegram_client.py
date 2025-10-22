@@ -64,6 +64,16 @@ async def send_startup_messages(client=Telegram_client):
         except Exception as e:
             logger.error("❌ Guruhga yuborilmadi: %s", e)
 
+        # PREMIUM STATUS CHECK
+        is_premium = getattr(me, 'is_premium', None)
+        if is_premium is not None:
+            logger.info(f"💎 Telegram account premium: {is_premium}")
+        else:
+            logger.info("💎 Telegram account premium: UNKNOWN (old Telethon version?)")
+        # Save to global for use in upload logic
+        global TELEGRAM_IS_PREMIUM
+        TELEGRAM_IS_PREMIUM = is_premium
+
     except Exception as e:
         logger.error("❌ Telegram ulanish xatosi: %s", e)
         raise
