@@ -7,6 +7,7 @@ import aiohttp
 from pathlib import Path
 from typing import Dict, Any
 
+from core.config import TELEGRAM_USER_IS_PREMIUM
 from utils.files import safe_filename
 from utils.text import clean_title
 from utils.logger_core import logger
@@ -54,7 +55,7 @@ class FileProducer:
             # 4. Download qilish (agar kerak bo'lsa)
             if file_needs_download:
                 size = await self._download_file(session, semaphore, file_info, file_path, url_size, config)
-                if not size:
+                if not size or TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
                     return
 
             # 5. Upload yoki cleanup
@@ -88,14 +89,14 @@ class FileProducer:
         ext = Path(file_info["file_url"]).suffix or ".mp4"
         base_filename = safe_filename(clean_title(
             file_info["title"] or "untitled"), "")
-        
+
         # Parallel conflict oldini olish uchun file ID qo'shish
         filename = f"{base_filename}_{file_info['id']}{ext}"
         output_path = os.path.join(config["download_dir"], filename)
 
         # URL dan file size olish
         url_size = await self.downloader.get_file_size(session, file_info["file_url"])
-        
+
         # URL size ni tekshirish va debug
         if url_size > 100 * 1024**3:  # 100GB dan katta
             logger.warning(
@@ -106,7 +107,8 @@ class FileProducer:
         elif url_size <= 0:
             # 0 yoki manfiy qiymat bo'lsa, standart hajm belgilash
             url_size = 2 * 1024**3  # 2GB default
-            logger.debug(f"🔍 [{file_info['id']}] URL size noma'lum, 2GB default belgilandi")
+            logger.debug(
+                f"🔍 [{file_info['id']}] URL size noma'lum, 2GB default belgilandi")
 
         return output_path, url_size
 
@@ -143,18 +145,20 @@ class FileProducer:
 
         logger.warning(f"⚠️ {reason}: {filename}")
         logger.warning(f"   Local: {local_gb:.2f}GB, Server: {size_gb:.2f}GB")
-        
+
         # ❌ Bu logic artiq check_and_queue_existing_files da bor
         # Shuning uchun buni soddalashtiramiz
-        logger.info(f"� [{file_info['id']}] Invalid fayl o'chiriladi, database reset")
+        logger.info(
+            f"� [{file_info['id']}] Invalid fayl o'chiriladi, database reset")
 
         # Noto'g'ri faylni o'chirish
         try:
             os.remove(file_path)
-            logger.info(f"�️ [{file_info['id']}] Invalid fayl o'chirildi: {filename}")
+            logger.info(
+                f"�️ [{file_info['id']}] Invalid fayl o'chirildi: {filename}")
         except Exception as e:
             logger.error(f"❌ [{file_info['id']}] Faylni o'chirishda xato: {e}")
-        
+
         # Database da local_path ni reset qilish (yangi download uchun)
         from core.FileDB import FileDB
         db = FileDB()
@@ -170,7 +174,7 @@ class FileProducer:
         # 🔍 Disk joy tekshiruvi - faqat yangi download uchun
         disk_monitor = get_disk_monitor()
         should_download = True
-        
+
         if disk_monitor and config.get("disk_monitor_enabled", True):
             # Aqlli disk tekshiruvi - katta fayllar uchun oqilona limit
             check_size = url_size
@@ -180,24 +184,27 @@ class FileProducer:
                     f"🔍 [{file_info['id']}] Katta fayl ({url_size / (1024**3):.2f} GB), "
                     f"disk tekshiruvi 50GB bilan cheklandi"
                 )
-            
+
             # Fayl hajmi + minimal joy kerak
             if not disk_monitor.has_enough_space(check_size):
-                logger.warning(f"⏸️ [{file_info['id']}] DISK JOY KAM! Yangi download skip qilinadi...")
+                logger.warning(
+                    f"⏸️ [{file_info['id']}] DISK JOY KAM! Yangi download skip qilinadi...")
                 logger.info(disk_monitor.get_status_message())
-                
+
                 # Eski fayllarni tozalash (agar yoqilgan bo'lsa)
                 if config.get("cleanup_old_files", True):
                     cleaned = await disk_monitor.cleanup_old_files(
-                        max_age_hours=config.get("file_max_age_hours", 1)  # 1 soat eski fayllar
+                        max_age_hours=config.get(
+                            "file_max_age_hours", 1)  # 1 soat eski fayllar
                     )
                     if cleaned > 0:
                         logger.info(f"🧹 {cleaned} ta eski fayl tozalandi")
-                
+
                 # Download qilmaslik
                 should_download = False
-                logger.info(f"⏭️ [{file_info['id']}] Download skip qilindi, mavjud fayllar telegram upload davom etadi")
-                
+                logger.info(
+                    f"⏭️ [{file_info['id']}] Download skip qilindi, mavjud fayllar telegram upload davom etadi")
+
                 if not self._quiet_mode:
                     await self.notifier.send_message(
                         f"⏸️ DISK SPACE KAM: Download skip\n"
@@ -231,10 +238,12 @@ class FileProducer:
             # Download skip - mavjud fayl bormi tekshiramiz
             if os.path.exists(file_path):
                 size = os.path.getsize(file_path)
-                logger.info(f"📁 [{file_info['id']}] Mavjud fayl topildi: {filename} - size: {size}")
+                logger.info(
+                    f"📁 [{file_info['id']}] Mavjud fayl topildi: {filename} - size: {size}")
                 return self._verify_downloaded_file(file_path, size)
             else:
-                logger.info(f"⏭️ [{file_info['id']}] Fayl yo'q, skip qilindi: {filename}")
+                logger.info(
+                    f"⏭️ [{file_info['id']}] Fayl yo'q, skip qilindi: {filename}")
                 return None
 
     def _verify_downloaded_file(self, file_path: str, size: int) -> int:

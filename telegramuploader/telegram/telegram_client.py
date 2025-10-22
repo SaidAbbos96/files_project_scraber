@@ -73,8 +73,7 @@ async def send_startup_messages(client=Telegram_client):
             logger.info(
                 "💎 Telegram account premium: UNKNOWN (old Telethon version?)")
         # Save to global for use in upload logic
-        global TELEGRAM_IS_PREMIUM
-        TELEGRAM_IS_PREMIUM = is_premium
+        config.TELEGRAM_USER_IS_PREMIUM = is_premium
 
     except Exception as e:
         logger.error("❌ Telegram ulanish xatosi: %s", e)

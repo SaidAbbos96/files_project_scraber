@@ -11,8 +11,7 @@ from typing import Any, Dict, Optional
 
 from telethon.tl.types import DocumentAttributeVideo
 from tqdm.asyncio import tqdm
-
-from core.config import FILES_GROUP_ID, FILES_GROUP_LINK, WORKER_NAME
+from core.config import FILES_GROUP_ID, FILES_GROUP_LINK, WORKER_NAME, TELEGRAM_USER_IS_PREMIUM
 from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
 from telegramuploader.utils.diagnostics import diagnostics
 from utils.helpers import format_file_size
@@ -344,8 +343,8 @@ class TelegramUploader:
                     # logger.info(f"✅ Video validation passed: {reason}")
 
             # --- PREMIUM LIMIT CHECK ---
-            from telegramuploader.telegram.telegram_client import TELEGRAM_IS_PREMIUM
-            if TELEGRAM_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+
+            if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
                 logger.warning(f"⏭️ Premium emas: {filename} ({size} bytes) 2GB dan katta, o'tkazib yuborildi!")
                 diagnostics.log_error(filename, size, "Not premium, skipped", "File >2GB, not premium", 0)
                 return False

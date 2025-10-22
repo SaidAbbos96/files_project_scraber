@@ -108,7 +108,7 @@ TELEGRAM_PHONE_NUMBER = os.getenv("TELEGRAM_PHONE_NUMBER", "+998200089990")
 FILES_GROUP_ID = os.getenv("FILES_GROUP_ID", "-1002699309226")
 FILES_GROUP_LINK = os.getenv(
     "FILES_GROUP_LINK", "https://t.me/+GGzAizSJb-g0MzQy")
-
+TELEGRAM_USER_IS_PREMIUM = os.getenv("TELEGRAM_USER_IS_PREMIUM", False)
 
 def make_config(site_config, overrides=None):
     """
