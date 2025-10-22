@@ -43,7 +43,8 @@ async def send_startup_messages(client=Telegram_client):
     try:
         await client.start()
         me = await client.get_me()
-        logger.info("✅ Auth qilindi: %s", me.username or me.first_name)
+        logger.info(
+            f"✅ Auth qilindi: {me.username or me.first_name}, premium: {getattr(me, 'premium', 'UNKNOWN')}")
 
         # Sana va vaqtni olish
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -65,11 +66,12 @@ async def send_startup_messages(client=Telegram_client):
             logger.error("❌ Guruhga yuborilmadi: %s", e)
 
         # PREMIUM STATUS CHECK
-        is_premium = getattr(me, 'is_premium', None)
+        is_premium = getattr(me, 'premium', None)
         if is_premium is not None:
             logger.info(f"💎 Telegram account premium: {is_premium}")
         else:
-            logger.info("💎 Telegram account premium: UNKNOWN (old Telethon version?)")
+            logger.info(
+                "💎 Telegram account premium: UNKNOWN (old Telethon version?)")
         # Save to global for use in upload logic
         global TELEGRAM_IS_PREMIUM
         TELEGRAM_IS_PREMIUM = is_premium
