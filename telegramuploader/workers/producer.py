@@ -58,9 +58,9 @@ class FileProducer:
                 # 2GB limit for non-premium
                 if not size:
                     return
-                if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
-                    logger.warning(f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({size} bytes) 2GB dan katta, yuklab olinmaydi!")
-                    return
+            if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+                logger.warning(f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({size} bytes) 2GB dan katta, yuklab olinmaydi!")
+                return
 
             # 5. Upload yoki cleanup
             await self._handle_post_download(queue, file_info, file_path, size, config)
