@@ -11,7 +11,8 @@ from typing import Any, Dict, Optional
 
 from telethon.tl.types import DocumentAttributeVideo
 from tqdm.asyncio import tqdm
-from core.config import FILES_GROUP_ID, FILES_GROUP_LINK, WORKER_NAME, TELEGRAM_USER_IS_PREMIUM
+from core.config import FILES_GROUP_ID, FILES_GROUP_LINK, WORKER_NAME
+from core import config as app_config
 from telegramuploader.telegram.telegram_client import Telegram_client, resolve_group
 from telegramuploader.utils.diagnostics import diagnostics
 from utils.helpers import format_file_size
@@ -344,9 +345,11 @@ class TelegramUploader:
 
             # --- PREMIUM LIMIT CHECK ---
 
-            if TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
-                logger.warning(f"⏭️ Premium emas: {filename} ({size} bytes) 2GB dan katta, o'tkazib yuborildi!")
-                diagnostics.log_error(filename, size, "Not premium, skipped", "File >2GB, not premium", 0)
+            if app_config.TELEGRAM_USER_IS_PREMIUM is False and size > 2 * 1024 * 1024 * 1024:
+                logger.warning(
+                    f"⏭️ Premium emas: {filename} ({size} bytes) 2GB dan katta, o'tkazib yuborildi!")
+                diagnostics.log_error(
+                    filename, size, "Not premium, skipped", "File >2GB, not premium", 0)
                 return False
 
             # 📌 Caption yaratish
