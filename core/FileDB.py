@@ -139,7 +139,8 @@ class FileDB:
     def delete_files(self, config_name):
         conn = self._connect()
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?", (config_name,))
+        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?",
+                  (config_name,))
         count = c.fetchone()[0]
         c.execute("DELETE FROM files WHERE config_name=?", (config_name,))
         conn.commit()
@@ -148,42 +149,43 @@ class FileDB:
 
     def get_undownloaded_files(self, config_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Yuklanmagan fayllarni olish (local_path bo'sh bo'lganlar)
-        
+
         Args:
             config_name: Config nomi
             limit: Maksimal fayllar soni
-            
+
         Returns:
             List of undownloaded files
         """
         conn = self._connect()
         c = conn.cursor()
-        
-        # Base query - yuklanmagan va file_url mavjud bo'lgan fayllar
+
+        # Base query - telegramga yuklanmagan (uploaded=0) va localga ham yuklanmagan fayllar
         query = """
             SELECT * FROM files 
             WHERE config_name=? 
+            AND (uploaded IS NULL OR uploaded=0)
             AND (local_path IS NULL OR local_path = '')
             AND file_url IS NOT NULL 
             AND file_url != ''
             AND file_url NOT LIKE '%t.me%'
             ORDER BY id
         """
-        
+
         if limit:
             query += f" LIMIT {limit}"
-            
+
         c.execute(query, (config_name,))
         results = c.fetchall()
         conn.close()
-        
+
         # Convert to dict format
         files = []
         columns = [desc[0] for desc in c.description]
         for row in results:
             file_dict = dict(zip(columns, row))
             files.append(file_dict)
-            
+
         return files
 
     def file_exists(self, config_name: str, file_page: str) -> bool:
@@ -201,7 +203,8 @@ class FileDB:
         """Bitta config'dagi jami fayllar sonini qaytarish"""
         conn = self._connect()
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?", (config_name,))
+        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?",
+                  (config_name,))
         count = c.fetchone()[0]
         conn.close()
         return count
@@ -232,30 +235,30 @@ class FileDB:
 
     def reset_uploaded_status(self, config_name: str) -> int:
         """Bitta config'dagi barcha fayllarning uploaded statusini reset qilish
-        
+
         Args:
             config_name: Config nomi
-            
+
         Returns:
             int: Reset qilingan fayllar soni
         """
         conn = self._connect()
         c = conn.cursor()
-        
+
         # Avval nechta fayl reset qilinishini sanash
         c.execute(
             "SELECT COUNT(*) FROM files WHERE config_name=? AND uploaded=1",
             (config_name,)
         )
         reset_count = c.fetchone()[0]
-        
+
         # Uploaded statusni reset qilish (faqat uploaded=1 bo'lgan fayllarni)
         c.execute(
             "UPDATE files SET uploaded=0, uploaded_at=NULL WHERE config_name=? AND uploaded=1",
             (config_name,)
         )
-        
+
         conn.commit()
         conn.close()
-        
+
         return reset_count
