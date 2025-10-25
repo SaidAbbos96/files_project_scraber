@@ -28,8 +28,10 @@ class TelegramUploaderOrchestrator:
         self.config = config
 
         # Core components
-        self.downloader = FileDownloader(base_timeout=None, max_retries=3)  # ⚡ Timeout removed - unlimited download time
-        self.uploader = TelegramUploader()   # Timeout yo'q - muvaffaqiyatli yuklashni to'xtatmaymiz
+        # ⚡ Timeout removed - unlimited download time
+        self.downloader = FileDownloader(base_timeout=None, max_retries=3)
+        # Timeout yo'q - muvaffaqiyatli yuklashni to'xtatmaymiz
+        self.uploader = TelegramUploader()
         # StreamingUploader - agar config da telegram_group bo'lmasa, default ishlatadi
         self.stream_uploader = StreamingUploader(
             # None bo'lsa default ishlatadi
