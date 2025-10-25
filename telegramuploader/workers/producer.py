@@ -7,7 +7,7 @@ import aiohttp
 from pathlib import Path
 from typing import Dict, Any
 
-from core.config import TELEGRAM_USER_IS_PREMIUM
+from core import config as app_config
 from utils.files import safe_filename
 from utils.text import clean_title
 from utils.logger_core import logger
@@ -55,7 +55,7 @@ class FileProducer:
             # 4. Download qilish (agar kerak bo'lsa)
             size_2gb = 2 * 1024 * 1024 * 1024
             # Yuklashdan avval hajmni tekshirish
-            if TELEGRAM_USER_IS_PREMIUM is False and url_size > size_2gb:
+            if app_config.TELEGRAM_USER_IS_PREMIUM is False and url_size > size_2gb:
                 logger.warning(
                     f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({url_size} bytes) 2GB dan katta, yuklab olinmaydi!")
                 return
@@ -65,7 +65,7 @@ class FileProducer:
                 # 2GB limit for non-premium (yuklab bo'lgandan keyin ham tekshiramiz)
                 if not size:
                     return
-                if TELEGRAM_USER_IS_PREMIUM is False and size > size_2gb:
+                if app_config.TELEGRAM_USER_IS_PREMIUM is False and size > size_2gb:
                     logger.warning(
                         f"⏭️ Premium emas: {file_info.get('title', 'unknown')} ({size} bytes) 2GB dan katta, yuklab olinmaydi!")
                     return
