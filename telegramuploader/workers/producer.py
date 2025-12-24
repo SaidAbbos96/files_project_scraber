@@ -172,7 +172,7 @@ class FileProducer:
             logger.error(f"❌ [{file_info['id']}] Faylni o'chirishda xato: {e}")
 
         # Database da local_path ni reset qilish (yangi download uchun)
-        from core.PostgreSQLFileDB import FileDB
+        from core.FileDB import FileDB
         db = FileDB()
         db.update_file(file_info['id'], local_path=None)
 

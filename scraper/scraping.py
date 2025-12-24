@@ -12,7 +12,7 @@ Bu modul scraping jarayonining asosiy oqimini boshqaradi:
 import asyncio
 from typing import List, Dict, Optional, Tuple
 
-from core.PostgreSQLFileDB import FileDB
+from core.FileDB import FileDB
 from utils.helpers import parse_page_selection
 from utils.logger_core import logger
 from tqdm import tqdm

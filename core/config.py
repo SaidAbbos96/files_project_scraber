@@ -15,9 +15,9 @@ DB_NAME = os.getenv("DB_NAME", "files_project")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-# Legacy local database settings (for backward compatibility)
-DB_LOCAL_NAME = os.getenv("DB_LOCAL_NAME", "local_files")
-DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
+# Legacy local database settings (deprecated - use PostgreSQL)
+# DB_LOCAL_NAME = os.getenv("DB_LOCAL_NAME", "local_files")
+# DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
 
 def get_database_url():
     """Get PostgreSQL database URL from environment variables"""

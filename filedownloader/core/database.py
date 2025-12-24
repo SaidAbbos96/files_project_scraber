@@ -3,7 +3,7 @@ Database operations for file downloader
 """
 from typing import List, Dict, Any, Optional
 
-from core.PostgreSQLFileDB import FileDB
+from core.FileDB import FileDB
 from utils.logger_core import logger
 from utils.telegram import detect_telegram_type
 

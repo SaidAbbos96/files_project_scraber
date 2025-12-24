@@ -10,7 +10,7 @@ import asyncio
 import aiohttp
 from typing import List, Dict, Any
 
-from core.PostgreSQLFileDB import FileDB
+from core.FileDB import FileDB
 import sys
 import os
 # Add the parent directory to sys.path to import telegram module

@@ -2,12 +2,12 @@ import asyncio
 import os
 import shutil
 from pathlib import Path
-from core.PostgreSQLFileDB import FileDB
+from core.FileDB import FileDB
 from core.db_info import print_all_file_urls
 from filedownloader.legacy_adapter import download
 from utils.logger_core import logger
 from scraper import scrape, ScrapingOrchestrator, quick_scrape
-from core.config import APP_CONFIG, BROWSER_CONFIG, DB_PATH
+from core.config import APP_CONFIG, BROWSER_CONFIG
 from core.site_configs import SITE_CONFIGS
 from telegramuploader.legacy_adapter import download_and_upload, upload_only_mode
 from utils.system_diagnostics import SystemDiagnostics
@@ -561,13 +561,20 @@ async def clear_downloads_cache():
 
 
 async def clear_database_file():
-    """Database faylini tozalash"""
+    """PostgreSQL database ma'lumotlarini tozalash"""
     try:
-        if os.path.exists(DB_PATH):
-            os.remove(DB_PATH)
-            logger.info(f"✅ Database fayli o'chirildi: {DB_PATH}")
-        else:
-            logger.info("📂 Database fayli mavjud emas")
+        db = FileDB()
+        # Barcha site config'lar uchun ma'lumotlarni o'chirish
+        from core.site_configs import SITE_CONFIGS
+        total_deleted = 0
+        
+        for site_name in SITE_CONFIGS.keys():
+            deleted_count = db.delete_files(site_name)
+            total_deleted += deleted_count
+            logger.info(f"🗑️ {site_name}: {deleted_count} ta fayl o'chirildi")
+        
+        logger.info(f"✅ Jami {total_deleted} ta yozuv o'chirildi")
+        
     except Exception as e:
         logger.error(f"❌ Database tozalashda xato: {e}")
 

@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 from typing import List, Dict, Any
 
-from core.PostgreSQLFileDB import FileDB
+from core.FileDB import FileDB
 from utils.logger_core import logger
 from .core.downloader import FileDownloader
 from .core.uploader import TelegramUploader

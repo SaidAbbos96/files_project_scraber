@@ -108,7 +108,7 @@ sudo apt install -y \
     libavresample-dev 2>/dev/null || print_warning "Qo'shimcha multimedia kutubxonalar o'rnatilmadi"
 
 print_step "Loyiha papkalarini yaratish..."
-mkdir -p downloads results finish logs local_db || handle_error "papkalar yaratish"
+mkdir -p downloads results finish logs || handle_error "papkalar yaratish"
 
 print_step ".env fayl sozlash..."
 if [ ! -f ".env" ]; then
@@ -283,7 +283,7 @@ echo "- Server muhitida GUI paketlar shart emas, headless mode ishlatiladi"
 echo ""
 echo "❓ Muammo bo'lsa:"
 echo "- Loglarni tekshiring: cat logs/app.log"
-echo "- Database ulanishini tekshiring: python -c 'from core.PostgreSQLFileDB import FileDB; db=FileDB()'"
+echo "- Database ulanishini tekshiring: python -c 'from core.FileDB import FileDB; db=FileDB()'"
 echo "- Browser test: python -c 'from playwright.async_api import async_playwright'"
 echo "- FFmpeg test: ffmpeg -version"
 echo "- Alembic status: alembic current"

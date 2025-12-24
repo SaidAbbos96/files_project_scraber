@@ -321,12 +321,12 @@ class SystemDiagnostics:
 
         required_dirs = [
             'core', 'scraper', 'filedownloader', 'telegramuploader',
-            'utils', 'logs', 'downloads', 'local_db', 'results'
+            'utils', 'logs', 'downloads', 'results'
         ]
 
         required_files = [
             'main.py', 'requirements.txt', 'README.md',
-            'core/config.py', 'core/FileDB.py',
+            'core/config.py', 'core/models.py', 'core/PostgreSQLFileDB.py',
             'utils/logger_core.py'
         ]
 
@@ -428,7 +428,7 @@ class SystemDiagnostics:
                             f"chmod u+w {current_dir}")
 
         # Important directories
-        important_dirs = ['logs', 'downloads', 'local_db', 'results']
+        important_dirs = ['logs', 'downloads', 'results']
         for dir_name in important_dirs:
             dir_path = current_dir / dir_name
             if dir_path.exists():

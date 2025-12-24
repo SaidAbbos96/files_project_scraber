@@ -1,264 +1,307 @@
-import sqlite3
-from datetime import datetime
+"""
+PostgreSQL-based FileDB implementation using SQLAlchemy
+"""
 from typing import List, Dict, Any, Optional
-from core.config import DB_PATH
+from datetime import datetime
+from sqlalchemy import create_engine, func, desc, asc, text
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+
+from core.config import get_database_url
+from core.models import File, Base
+
+logger = logging.getLogger(__name__)
 
 
-class FileDB:
-    def __init__(self, db_path=DB_PATH):
-        self.db_path = db_path
-        self._init_db()
-
-    def _connect(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row  # ✅ dict-style natija
-        return conn
-
-    def _init_db(self):
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute(
-            """
-        CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            config_name TEXT,
-            file_page TEXT,
-            title TEXT,
-            categories TEXT,
-            language TEXT,
-            description TEXT,
-            file_url TEXT,
-            image TEXT,
-            year TEXT,
-            country TEXT,
-            actors TEXT,
-            local_path TEXT,
-            file_size INTEGER,
-            mime TEXT,
-            telegram_type TEXT,
-            uploaded BOOLEAN DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            uploaded_at TEXT
-        )
-        """
-        )
-        conn.commit()
-        conn.close()
-
-    # --- CRUD funksiyalar ---
-
-    def get_files(self, config_name, sort_by_size=None):
-        conn = self._connect()
-        conn.row_factory = sqlite3.Row  # 🔑 Har bir natija Row obyekt bo'ladi
-        c = conn.cursor()
-
-        sql = "SELECT * FROM files WHERE config_name=?"
-        if sort_by_size is not None:
-            if sort_by_size == 1:
-                sql += " ORDER BY file_size ASC"  # 1 = eng kichikdan boshla
-            elif sort_by_size == 0:
-                sql += " ORDER BY file_size DESC"  # 0 = eng kattadan boshla
-            # boshqa qiymatlarda sort qilinmaydi
-
-        c.execute(sql, (config_name,))
-        rows = c.fetchall()
-        conn.close()
-        return [dict(r) for r in rows]  # ✅ endi dict sifatida qaytaradi
-
-    def get_file(self, file_id):
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute("SELECT * FROM files WHERE id=?", (file_id,))
-        row = c.fetchone()
-        conn.close()
-        return dict(row) if row else None  # ✅ dict yoki None
-
-    def insert_file(self, config_name, item):
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute(
-            """
-        INSERT INTO files (
-            config_name, file_page, title, categories, language, description,
-            file_url, image, year, country, actors,
-            local_path, file_size, mime, telegram_type, uploaded
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                config_name,
-                item.get("file_page"),
-                item.get("title"),
-                item.get("categories"),
-                item.get("language") or "uz",
-                item.get("description"),
-                item.get("file_url"),
-                item.get("image"),
-                item.get("year"),
-                item.get("country"),
-                item.get("actors"),
-                item.get("local_path"),
-                item.get("file_size"),
-                item.get("mime"),
-                item.get("telegram_type"),
-                int(item.get("uploaded", False)),
-            ),
-        )
-        conn.commit()
-        conn.close()
-
-    def update_file(self, file_id, **kwargs):
-        if not kwargs:
-            return
-
-        conn = self._connect()
-        c = conn.cursor()
-
-        fields = []
-        values = []
-
-        for key, val in kwargs.items():
-            if key == "uploaded" and val:
-                fields.append("uploaded_at=?")
-                values.append(datetime.utcnow().isoformat())
-            fields.append(f"{key}=?")
-            values.append(val)
-
-        values.append(file_id)
-        sql = f"UPDATE files SET {', '.join(fields)} WHERE id=?"
-        c.execute(sql, tuple(values))
-        conn.commit()
-        conn.close()
-
-    def delete_file(self, file_id):
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute("DELETE FROM files WHERE id=?", (file_id,))
-        conn.commit()
-        conn.close()
-
-    def delete_files(self, config_name):
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?",
-                  (config_name,))
-        count = c.fetchone()[0]
-        c.execute("DELETE FROM files WHERE config_name=?", (config_name,))
-        conn.commit()
-        conn.close()
-        return count
-
-    def get_undownloaded_files(self, config_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Yuklanmagan fayllarni olish (local_path bo'sh bo'lganlar)
-
+class PostgreSQLFileDB:
+    """PostgreSQL-based file database using SQLAlchemy"""
+    
+    def __init__(self, database_url: Optional[str] = None):
+        """Initialize PostgreSQL database connection
+        
         Args:
-            config_name: Config nomi
-            limit: Maksimal fayllar soni
-
+            database_url: PostgreSQL connection URL. If None, uses config
+        """
+        self.database_url = database_url or get_database_url()
+        self.engine = create_engine(
+            self.database_url,
+            echo=False,  # Set to True for SQL debugging
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,  # Verify connections before use
+            pool_recycle=3600,  # Recycle connections every hour
+        )
+        self.SessionLocal = sessionmaker(bind=self.engine)
+        
+        # Create tables if they don't exist
+        self._init_db()
+    
+    def _init_db(self):
+        """Initialize database tables"""
+        try:
+            Base.metadata.create_all(bind=self.engine)
+            logger.info("Database tables created successfully")
+        except SQLAlchemyError as e:
+            logger.error(f"Error creating database tables: {e}")
+            raise
+    
+    def _get_session(self) -> Session:
+        """Get database session"""
+        return self.SessionLocal()
+    
+    def get_files(self, config_name: str, sort_by_size: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all files for a config with optional sorting
+        
+        Args:
+            config_name: Configuration name
+            sort_by_size: 1 for ASC, 0 for DESC, None for no sorting
+            
+        Returns:
+            List of file dictionaries
+        """
+        with self._get_session() as session:
+            query = session.query(File).filter(File.config_name == config_name)
+            
+            if sort_by_size is not None:
+                if sort_by_size == 1:
+                    query = query.order_by(asc(File.file_size))
+                elif sort_by_size == 0:
+                    query = query.order_by(desc(File.file_size))
+            
+            files = query.all()
+            return [file.to_dict() for file in files]
+    
+    def get_file(self, file_id: int) -> Optional[Dict[str, Any]]:
+        """Get single file by ID
+        
+        Args:
+            file_id: File ID
+            
+        Returns:
+            File dictionary or None if not found
+        """
+        with self._get_session() as session:
+            file = session.query(File).filter(File.id == file_id).first()
+            return file.to_dict() if file else None
+    
+    def insert_file(self, config_name: str, item: Dict[str, Any]) -> int:
+        """Insert new file
+        
+        Args:
+            config_name: Configuration name
+            item: File data dictionary
+            
+        Returns:
+            ID of inserted file
+        """
+        with self._get_session() as session:
+            file = File(
+                config_name=config_name,
+                file_page=item.get("file_page"),
+                title=item.get("title"),
+                categories=item.get("categories"),
+                language=item.get("language", "uz"),
+                description=item.get("description"),
+                file_url=item.get("file_url"),
+                image=item.get("image"),
+                year=item.get("year"),
+                country=item.get("country"),
+                actors=item.get("actors"),
+                local_path=item.get("local_path"),
+                file_size=item.get("file_size"),
+                mime=item.get("mime"),
+                telegram_type=item.get("telegram_type"),
+                uploaded=bool(item.get("uploaded", False))
+            )
+            session.add(file)
+            session.commit()
+            return file.id
+    
+    def update_file(self, file_id: int, **kwargs) -> bool:
+        """Update file by ID
+        
+        Args:
+            file_id: File ID
+            **kwargs: Fields to update
+            
+        Returns:
+            True if updated, False if not found
+        """
+        if not kwargs:
+            return False
+            
+        with self._get_session() as session:
+            file = session.query(File).filter(File.id == file_id).first()
+            if not file:
+                return False
+            
+            # Handle uploaded_at timestamp
+            if kwargs.get("uploaded"):
+                kwargs["uploaded_at"] = datetime.utcnow()
+            
+            # Update fields
+            for key, value in kwargs.items():
+                if hasattr(file, key):
+                    setattr(file, key, value)
+            
+            session.commit()
+            return True
+    
+    def delete_file(self, file_id: int) -> bool:
+        """Delete file by ID
+        
+        Args:
+            file_id: File ID
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        with self._get_session() as session:
+            file = session.query(File).filter(File.id == file_id).first()
+            if not file:
+                return False
+            
+            session.delete(file)
+            session.commit()
+            return True
+    
+    def delete_files(self, config_name: str) -> int:
+        """Delete all files for a config
+        
+        Args:
+            config_name: Configuration name
+            
+        Returns:
+            Number of deleted files
+        """
+        with self._get_session() as session:
+            count = session.query(File).filter(File.config_name == config_name).count()
+            session.query(File).filter(File.config_name == config_name).delete()
+            session.commit()
+            return count
+    
+    def get_undownloaded_files(self, config_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get files that haven't been downloaded
+        
+        Args:
+            config_name: Configuration name
+            limit: Maximum number of files to return
+            
         Returns:
             List of undownloaded files
         """
-        conn = self._connect()
-        c = conn.cursor()
-
-        # Base query - telegramga yuklanmagan (uploaded=0) va localga ham yuklanmagan fayllar
-        query = """
-            SELECT * FROM files 
-            WHERE config_name=? 
-            AND (uploaded IS NULL OR uploaded=0)
-            AND (local_path IS NULL OR local_path = '')
-            AND file_url IS NOT NULL 
-            AND file_url != ''
-            AND file_url NOT LIKE '%t.me%'
-            ORDER BY id
-        """
-
-        if limit:
-            query += f" LIMIT {limit}"
-
-        c.execute(query, (config_name,))
-        results = c.fetchall()
-        conn.close()
-
-        # Convert to dict format
-        files = []
-        columns = [desc[0] for desc in c.description]
-        for row in results:
-            file_dict = dict(zip(columns, row))
-            files.append(file_dict)
-
-        return files
-
+        with self._get_session() as session:
+            query = session.query(File).filter(
+                File.config_name == config_name,
+                (File.uploaded.is_(None) | (File.uploaded == False)),
+                (File.local_path.is_(None) | (File.local_path == '')),
+                File.file_url.isnot(None),
+                File.file_url != '',
+                ~File.file_url.like('%t.me%')
+            ).order_by(File.id)
+            
+            if limit:
+                query = query.limit(limit)
+            
+            files = query.all()
+            return [file.to_dict() for file in files]
+    
     def file_exists(self, config_name: str, file_page: str) -> bool:
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute(
-            "SELECT 1 FROM files WHERE config_name=? AND file_page=? LIMIT 1",
-            (config_name, file_page),
-        )
-        exists = c.fetchone() is not None
-        conn.close()
-        return exists
-
-    def get_files_count(self, config_name: str) -> int:
-        """Bitta config'dagi jami fayllar sonini qaytarish"""
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM files WHERE config_name=?",
-                  (config_name,))
-        count = c.fetchone()[0]
-        conn.close()
-        return count
-
-    def get_downloaded_files_count(self, config_name: str) -> int:
-        """Yuklangan fayllar sonini qaytarish (local_path mavjud)"""
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute(
-            "SELECT COUNT(*) FROM files WHERE config_name=? AND local_path IS NOT NULL AND local_path != ''",
-            (config_name,)
-        )
-        count = c.fetchone()[0]
-        conn.close()
-        return count
-
-    def get_uploaded_files_count(self, config_name: str) -> int:
-        """Telegramga yuklangan fayllar sonini qaytarish"""
-        conn = self._connect()
-        c = conn.cursor()
-        c.execute(
-            "SELECT COUNT(*) FROM files WHERE config_name=? AND uploaded=1",
-            (config_name,)
-        )
-        count = c.fetchone()[0]
-        conn.close()
-        return count
-
-    def reset_uploaded_status(self, config_name: str) -> int:
-        """Bitta config'dagi barcha fayllarning uploaded statusini reset qilish
-
+        """Check if file exists
+        
         Args:
-            config_name: Config nomi
-
+            config_name: Configuration name
+            file_page: File page URL
+            
         Returns:
-            int: Reset qilingan fayllar soni
+            True if exists, False otherwise
         """
-        conn = self._connect()
-        c = conn.cursor()
+        with self._get_session() as session:
+            exists = session.query(
+                session.query(File).filter(
+                    File.config_name == config_name,
+                    File.file_page == file_page
+                ).exists()
+            ).scalar()
+            return exists
+    
+    def get_files_count(self, config_name: str) -> int:
+        """Get total files count for config
+        
+        Args:
+            config_name: Configuration name
+            
+        Returns:
+            Total files count
+        """
+        with self._get_session() as session:
+            return session.query(File).filter(File.config_name == config_name).count()
+    
+    def get_downloaded_files_count(self, config_name: str) -> int:
+        """Get downloaded files count
+        
+        Args:
+            config_name: Configuration name
+            
+        Returns:
+            Downloaded files count
+        """
+        with self._get_session() as session:
+            return session.query(File).filter(
+                File.config_name == config_name,
+                File.local_path.isnot(None),
+                File.local_path != ''
+            ).count()
+    
+    def get_uploaded_files_count(self, config_name: str) -> int:
+        """Get uploaded files count
+        
+        Args:
+            config_name: Configuration name
+            
+        Returns:
+            Uploaded files count
+        """
+        with self._get_session() as session:
+            return session.query(File).filter(
+                File.config_name == config_name,
+                File.uploaded == True
+            ).count()
+    
+    def reset_uploaded_status(self, config_name: str) -> int:
+        """Reset uploaded status for all files in config
+        
+        Args:
+            config_name: Configuration name
+            
+        Returns:
+            Number of reset files
+        """
+        with self._get_session() as session:
+            # Count files to reset
+            count = session.query(File).filter(
+                File.config_name == config_name,
+                File.uploaded == True
+            ).count()
+            
+            # Reset uploaded status
+            session.query(File).filter(
+                File.config_name == config_name,
+                File.uploaded == True
+            ).update({
+                File.uploaded: False,
+                File.uploaded_at: None
+            })
+            
+            session.commit()
+            return count
+    
+    def close(self):
+        """Close database connections"""
+        if hasattr(self, 'engine'):
+            self.engine.dispose()
 
-        # Avval nechta fayl reset qilinishini sanash
-        c.execute(
-            "SELECT COUNT(*) FROM files WHERE config_name=? AND uploaded=1",
-            (config_name,)
-        )
-        reset_count = c.fetchone()[0]
 
-        # Uploaded statusni reset qilish (faqat uploaded=1 bo'lgan fayllarni)
-        c.execute(
-            "UPDATE files SET uploaded=0, uploaded_at=NULL WHERE config_name=? AND uploaded=1",
-            (config_name,)
-        )
-
-        conn.commit()
-        conn.close()
-
-        return reset_count
+# Create a global instance for backward compatibility
+FileDB = PostgreSQLFileDB
