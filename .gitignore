@@ -96,13 +96,16 @@ Thumbs.db
 **/*.bmp
 **/*.svg
 
-# Downloads va cache papkalari - muhim fayllar
-downloads/
-downloads/*
-results/
-local_db/
-logs/
-finish/
+# Downloads va working papkalari - faqat .keep fayllar saqlanadi
+# downloads/
+# downloads/*
+**/results/*
+!**/results/.keep
+
+**/finish/*
+!**/finish/.keep
+
+# Session va log fayllar
 telegramuploader/session.session
 *.session
 
