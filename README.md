@@ -5,6 +5,8 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Playwright](https://img.shields.io/badge/playwright-1.55.0-green.svg)](https://playwright.dev/)
 [![Telethon](https://img.shields.io/badge/telethon-1.41.2-blue.svg)](https://github.com/LonamiWebs/Telethon)
+[![PostgreSQL](https://img.shields.io/badge/postgresql-13+-blue.svg)](https://www.postgresql.org/)
+[![SQLAlchemy](https://img.shields.io/badge/sqlalchemy-2.0+-green.svg)](https://www.sqlalchemy.org/)
 [![FFmpeg](https://img.shields.io/badge/ffmpeg-python-red.svg)](https://github.com/kkroening/ffmpeg-python)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -36,7 +38,7 @@
 | 🕷️ **Scraper** | Web scraping va data collection | Playwright + AsyncIO |
 | ⬇️ **FileDownloader** | Parallel/Sequential file downloading | aiohttp + disk monitoring |
 | ⬆️ **TelegramUploader** | Classic/Streaming/Upload-Only modes with video optimization | Telethon + FFmpeg + diagnostics |
-| 💾 **Core** | Database, config va shared utilities | SQLite + environment management |
+| 💾 **Core** | Database, config va shared utilities | PostgreSQL + SQLAlchemy + Alembic |
 | 🛠️ **Utils** | Logger, disk monitor, system diagnostics | Cross-cutting concerns |
 
 ---
@@ -119,7 +121,7 @@ python main.py
 - ✅ **Playwright Browser** - Chromium status
 - ✅ **Configuration** - Directories, files, permissions
 - ✅ **Network** - Internet connectivity
-- ✅ **Database** - SQLite status
+- ✅ **Database** - PostgreSQL ulanishi va migration status
 
 **Natija:**
 ```
@@ -193,8 +195,10 @@ files_project_scraber/
 ├── 🎯 main.py                 # Entry point - interactive menu
 │
 ├── 🧠 core/                   # Core functionality
-│   ├── config.py             # Global configuration
-│   ├── FileDB.py             # SQLite database wrapper  
+│   ├── config.py             # Global configuration + PostgreSQL settings
+│   ├── models.py             # SQLAlchemy database models
+│   ├── PostgreSQLFileDB.py   # PostgreSQL database implementation
+│   ├── FileDB.py             # Legacy SQLite wrapper (backward compatibility)
 │   ├── catigories.py         # Content categorization
 │   ├── site_configs.py       # Site-specific settings
 │   └── db_info.py            # Database utilities
@@ -258,6 +262,11 @@ files_project_scraber/
 ├── 📁 scripts/               # Shell scripts
 │   ├── git/                  # Git automation scripts
 │   └── maintenance/          # System maintenance scripts
+├── 📁 alembic/               # Database migrations
+│   ├── versions/             # Migration files
+│   ├── env.py                # Migration environment
+│   └── script.py.mako        # Migration template
+├── alembic.ini               # Alembic configuration
 └── 📁 tests/                 # Test files
 ```
 
@@ -286,8 +295,12 @@ files_project_scraber/
 ### 🗃️ Data & Storage
 | **Library** | **Version** | **Purpose** |
 |-------------|-------------|-------------|
-| **SQLite** | Built-in | Embedded database |
-| **Custom FileDB** | - | Statistics-enabled database wrapper |
+| **PostgreSQL** | 13+ | Production database server |
+| **SQLAlchemy** | 2.0.36 | Python SQL toolkit and ORM |
+| **Alembic** | 1.14.0 | Database migration tool |
+| **psycopg2-binary** | 2.9.10 | PostgreSQL adapter |
+| **asyncpg** | 0.30.0 | Async PostgreSQL driver |
+| **SQLite** | Built-in | Legacy/backup database |
 
 ### 🎨 UI & Utilities  
 | **Library** | **Version** | **Purpose** |
@@ -296,14 +309,35 @@ files_project_scraber/
 | **UzTransliterator** | 0.0.36 | O'zbek tili transliteratsiya |
 
 ### 📊 Key Optimizations
-- ✅ **7 paketdan iborat** (requirements.txt)  
-- ✅ **260MB+ disk space** tejash
-- ✅ **Tez o'rnatish** va yangilash
-- ✅ **Minimal conflicts** boshqa dasturlar bilan
+- ✅ **11 asosiy paket** (requirements.txt) + PostgreSQL stack
+- ✅ **Faqat Chromium browser** (~100MB disk space tejash)
+- ✅ **Remote database** - local storage minimal
+- ✅ **Tez o'rnatish** setup script bilan
+- ✅ **Production-ready** PostgreSQL + SQLAlchemy
 
 ---
 
 ## 📦 O'rnatish
+
+### 🚀 Avtomatik o'rnatish (Tavsiya etiladi)
+
+\`\`\`bash
+git clone https://github.com/SaidAbbos96/files_project_scraber.git
+cd files_project_scraber
+chmod +x setup_new_server.sh
+./setup_new_server.sh
+\`\`\`
+
+**Script quyidagilarni bajaradi:**
+- ✅ Sistema yangilanishi va Python dependencies
+- ✅ Virtual environment yaratish va faollashtirish
+- ✅ Requirements o'rnatish (PostgreSQL, SQLAlchemy, Alembic)
+- ✅ Playwright Chromium browser o'rnatish
+- ✅ FFmpeg va multimedia tools
+- ✅ .env fayl yaratish va sozlash
+- ✅ System diagnostics test
+
+### 🔧 Manual o'rnatish
 
 ### 1. Repository'ni clone qilish
 
@@ -315,7 +349,7 @@ cd files_project_scraber
 ### 2. Virtual environment yaratish
 
 \`\`\`bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Linux/Mac
 # yoki
 venv\\Scripts\\activate  # Windows
@@ -324,42 +358,76 @@ venv\\Scripts\\activate  # Windows
 ### 3. Dependencies o'rnatish
 
 \`\`\`bash
+pip install --upgrade pip
 pip install -r requirements.txt
 \`\`\`
 
-### 4. Playwright browserlarni o'rnatish
+### 4. Playwright Chromium o'rnatish
 
 \`\`\`bash
 playwright install chromium
+# Faqat Chromium kerak, boshqalar o'rnatilmaydi
 \`\`\`
 
-### 5. Telegram session sozlash
+### 5. PostgreSQL Database migration
 
 \`\`\`bash
-# Telegram API credentials kerak:
-# - API ID
-# - API Hash
-# Birinchi ishga tushirganda session.session fayli yaratiladi
+# .env faylidagi DB_* parametrlarni to'ldirganingizdan keyin:
+alembic upgrade head
 \`\`\`
 
 ---
 
 ## ⚙️ Sozlash
 
-### Environment Variables
+### 🗄️ PostgreSQL Database Configuration
 
 \`.env\` fayl yarating va quyidagi parametrlarni sozlang:
 
 \`\`\`bash
-# Database Configuration
-DB_PATH=files.db
+# ========================================
+# DATABASE CONFIGURATION
+# ========================================
+# PostgreSQL Database (Remote Server)
+DB_HOST=your_db_host
+DB_PORT=5432
+DB_NAME=files_scraber_db
+DB_USER=postgres
+DB_PASSWORD="your_password"
 
-# Directories
-DOWNLOAD_DIR=../downloads
-RESULTS_DIR=../results
+# ========================================
+# TELEGRAM API CONFIGURATION  
+# ========================================
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE_NUMBER=+998901234567
+FILES_GROUP_ID=-1002699309226
+FILES_GROUP_LINK=https://t.me/your_group
 
-# Logging
-LOGGING_ENABLED=True
+# ========================================
+# SYSTEM SETTINGS
+# ========================================
+WORKER_NAME=worker_001
+DOWNLOAD_CONCURRENCY=2
+SCRAPE_CONCURRENCY=5
+HEADLESS=1
+MODE=parallel
+\`\`\`
+
+### 🔄 Database Migration
+
+PostgreSQL serveri sozlangandan keyin:
+
+\`\`\`bash
+# Migration fayllarini yaratish
+alembic revision --autogenerate -m "Initial migration"
+
+# Database'ni yangilash
+alembic upgrade head
+
+# Migration statusini tekshirish
+alembic current
+\`\`\`
 
 # File Settings (bytes)
 FILE_MIN_SIZE=1048576  # 1MB

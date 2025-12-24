@@ -70,10 +70,11 @@ sudo apt install -y \
     libgtk-3-0 \
     libgdk-pixbuf2.0-0 || handle_error "system dependencies o'rnatish"
 
-print_step "Playwright browserlarni o'rnatish (bu biroz vaqt olishi mumkin)..."
+print_step "Playwright browserlarni o'rnatish (faqat Chromium)..."
 playwright install chromium || handle_error "Playwright chromium o'rnatish"
-playwright install firefox || handle_error "Playwright firefox o'rnatish"
-playwright install webkit || handle_error "Playwright webkit o'rnatish"
+# Faqat Chromium ishlatamiz, qolganlar shart emas
+# playwright install firefox || handle_error "Playwright firefox o'rnatish"
+# playwright install webkit || handle_error "Playwright webkit o'rnatish"
 
 print_step "Playwright system dependencies o'rnatish..."
 playwright install-deps || print_warning "playwright install-deps ba'zi xatoliklar bilan yakunlandi (bu normal)"
@@ -99,32 +100,54 @@ if [ ! -f ".env" ]; then
     else
         print_warning ".env.example fayl yo'q, .env yaratish..."
         cat > .env << 'EOF'
-# Database
+# ========================================
+# DATABASE CONFIGURATION
+# ========================================
+# PostgreSQL Database (Remote Server)
+DB_HOST=your_db_host
+DB_PORT=5432
+DB_NAME=files_scraber_db
+DB_USER=postgres
+DB_PASSWORD="your_password"
+
+# Local Database (Legacy - for backup)
 DB_LOCAL_NAME=local_files
 
-# Telegram API (O'z qiymatlaringizni kiriting!)
+# ========================================
+# TELEGRAM API CONFIGURATION
+# ========================================
 TELEGRAM_API_ID=your_api_id
 TELEGRAM_API_HASH=your_api_hash
 TELEGRAM_PHONE_NUMBER=+998901234567
+FILES_GROUP_ID=-1002699309226
 FILES_GROUP_LINK=https://t.me/your_group
+TELEGRAM_USER_IS_PREMIUM=true
 
-# Worker name
+# ========================================
+# WORKER CONFIGURATION
+# ========================================
 WORKER_NAME=worker_001
 
-# Download settings
+# ========================================
+# CONCURRENCY SETTINGS
+# ========================================
 DOWNLOAD_CONCURRENCY=2
 SCRAPE_CONCURRENCY=5
 UPLOAD_CONCURRENCY=2
+UPLOAD_WORKERS=2
 
-# Playwright settings
+# ========================================
+# BROWSER SETTINGS
+# ========================================
 HEADLESS=1
 
-# Disk monitoring
+# ========================================
+# SYSTEM SETTINGS
+# ========================================
 MIN_FREE_SPACE_GB=1.0
-
-# Logging
-LOGGING_ENABLED=True
+LOGGING_ENABLED=true
 DEBUG=false
+MODE=parallel
 EOF
         print_success ".env fayl yaratildi"
     fi
@@ -156,7 +179,7 @@ print_step "FFmpeg test qilish..."
 ffmpeg -version > /dev/null 2>&1 && print_success "FFmpeg muvaffaqiyatli o'rnatildi" || print_error "FFmpeg o'rnatishda muammo"
 ffprobe -version > /dev/null 2>&1 && print_success "FFprobe muvaffaqiyatli o'rnatildi" || print_error "FFprobe o'rnatishda muammo"
 
-print_step "Python importlarni test qilish..."
+print_step "Python importlarni va PostgreSQL ulanishini test qilish..."
 python -c "
 try:
     import aiohttp
@@ -164,7 +187,30 @@ try:
     import telethon
     import ffmpeg
     import tqdm
+    import sqlalchemy
+    import psycopg2
+    import alembic
     print('✅ Barcha Python kutubxonalar import bo\'ldi')
+    
+    # PostgreSQL ulanishini test qilish
+    from core.config import get_database_url
+    from sqlalchemy import create_engine
+    
+    try:
+        db_url = get_database_url()
+        print(f'🔗 Database URL yaratildi (parol yashirin)')
+        
+        # Ulanishni test qilish (agar DB sozlangan bo'lsa)
+        if 'your_db_host' not in db_url and 'your_password' not in db_url:
+            engine = create_engine(db_url)
+            engine.connect()
+            print('✅ PostgreSQL ulanishi muvaffaqiyatli!')
+        else:
+            print('⚠️  PostgreSQL sozlamalari to\'ldirilmagan (.env da)')
+    except Exception as e:
+        print(f'⚠️  PostgreSQL ulanish xatoligi: {e}')
+        print('💡 .env faylidagi DB_* parametrlarni to\'ldiring')
+        
 except ImportError as e:
     print(f'❌ Import xatoligi: {e}')
     exit(1)
@@ -179,27 +225,34 @@ echo "📝 KEYINGI QADAMLAR:"
 echo ""
 echo "1. 🔧 .env faylini to'ldiring:"
 echo "   nano .env"
+echo "   - DB_HOST, DB_NAME, DB_USER, DB_PASSWORD ni kiriting (PostgreSQL server)"
 echo "   - TELEGRAM_API_ID va TELEGRAM_API_HASH ni kiriting"
 echo "   - TELEGRAM_PHONE_NUMBER ni kiriting"
-echo "   - FILES_GROUP_LINK ni kiriting"
+echo "   - FILES_GROUP_ID va FILES_GROUP_LINK ni kiriting"
 echo ""
-echo "2. 🧪 Loyihani test qiling:"
+echo "2. 🗄️ PostgreSQL migration ishga tushiring:"
 echo "   source venv/bin/activate"
+echo "   alembic upgrade head"
+echo ""
+echo "3. 🧪 Loyihani test qiling:"
 echo "   python main.py"
 echo ""
-echo "3. 📊 Loglarni kuzating:"
+echo "4. 📊 Loglarni kuzating:"
 echo "   tail -f logs/app.log"
 echo ""
 echo "🎯 MUHIM ESLATMALAR:"
+echo "- Database REMOTE serverda joylashgan, local SQLite emas"
 echo "- Virtual environment har doim faollashtirilgan bo'lishi kerak: source venv/bin/activate"
-echo "- .env faylidagi Telegram sozlamalarni to'ldirish majburiy"
+echo "- .env faylidagi PostgreSQL va Telegram sozlamalarni to'ldirish majburiy"
 echo "- Birinchi ishga tushirishda Telegram autentifikatsiyasi kerak bo'ladi"
-echo "- Playwright browserlari ~200MB joy egallaydi"
-echo "- FFmpeg video processing uchun zarur"
+echo "- Faqat Chromium browser ishlatiladi (~100MB)"
+echo "- Alembic migration bilan database table yaratiladi"
 echo ""
 echo "❓ Muammo bo'lsa:"
 echo "- Loglarni tekshiring: cat logs/app.log"
+echo "- Database ulanishini tekshiring: python -c 'from core.PostgreSQLFileDB import FileDB; db=FileDB()'"
 echo "- Browser test: python -c 'from playwright.async_api import async_playwright'"
 echo "- FFmpeg test: ffmpeg -version"
+echo "- Alembic status: alembic current"
 echo ""
 print_success "Loyiha ishga tushirishga tayyor!"

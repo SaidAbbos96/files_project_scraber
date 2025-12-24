@@ -8,7 +8,7 @@ from typing import Dict, Any
 from utils.logger_core import logger
 from ..core.stream_uploader import StreamingUploader
 from ..handlers.notification import NotificationHandler
-from core.FileDB import FileDB
+from core.PostgreSQLFileDB import FileDB
 
 
 class StreamingProducer:

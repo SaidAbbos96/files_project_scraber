@@ -7,13 +7,31 @@ from dotenv import load_dotenv
 env_path = PathlibPath(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
-# Environment variables'dan o'qish (default qiymatlar bilan)
+# Database configuration
+# PostgreSQL connection settings
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "files_project")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+# Legacy local database settings (for backward compatibility)
 DB_LOCAL_NAME = os.getenv("DB_LOCAL_NAME", "local_files")
+DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
+
+def get_database_url():
+    """Get PostgreSQL database URL from environment variables"""
+    return f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+def get_async_database_url():
+    """Get async PostgreSQL database URL from environment variables"""
+    return f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# Other configuration
 LOGGING_ENABLED = os.getenv(
     "LOGGING_ENABLED", "True").lower() in ("true", "1", "yes")
 FILE_MIN_SIZE = int(
     os.getenv("FILE_MIN_SIZE", str(1024 * 1024)))  # Default: 1MB
-DB_PATH = f"local_db/{DB_LOCAL_NAME}.db"
 
 # Worker identification
 WORKER_NAME = os.getenv("WORKER_NAME", "worker_001")

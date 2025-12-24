@@ -1,4 +1,4 @@
-from core.FileDB import FileDB
+from core.PostgreSQLFileDB import FileDB
 from utils.logger_core import logger
 
 

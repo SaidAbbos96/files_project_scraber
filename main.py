@@ -2,7 +2,7 @@ import asyncio
 import os
 import shutil
 from pathlib import Path
-from core.FileDB import FileDB
+from core.PostgreSQLFileDB import FileDB
 from core.db_info import print_all_file_urls
 from filedownloader.legacy_adapter import download
 from utils.logger_core import logger

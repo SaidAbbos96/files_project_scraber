@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 
-from core.FileDB import FileDB
+from core.PostgreSQLFileDB import FileDB
 from utils.helpers import normalize_item_categories
 from utils.logger_core import logger
 from utils.text import (

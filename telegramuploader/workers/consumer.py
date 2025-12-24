@@ -4,7 +4,7 @@ File Consumer - Queue dan fayllarni olib Telegramga yuborish uchun
 import asyncio
 from typing import Dict, Any
 
-from core.FileDB import FileDB
+from core.PostgreSQLFileDB import FileDB
 from utils.telegram import detect_telegram_type
 from utils.logger_core import logger
 from ..core.uploader import TelegramUploader
