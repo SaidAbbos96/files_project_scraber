@@ -102,6 +102,10 @@ Thumbs.db
 **/results/*
 !**/results/.keep
 
+logs/
+logs/*
+!logs/.keep
+
 **/finish/*
 !**/finish/.keep
 
