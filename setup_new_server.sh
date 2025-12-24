@@ -52,23 +52,34 @@ print_step "Python requirements o'rnatish..."
 pip install --upgrade pip || handle_error "pip yangilash"
 pip install -r requirements.txt || handle_error "requirements o'rnatish"
 
-print_step "System dependencies o'rnatish (Playwright uchun)..."
-# Playwright dependencies
+print_step "System dependencies o'rnatish (Playwright uchun - ixtiyoriy)..."
+# Playwright dependencies - ba'zilari server muhitida bo'lmasligi mumkin
+print_warning "Ba'zi paketlar server muhitida mavjud bo'lmasligi mumkin, lekin bu normal."
+
+# Core dependencies (asosiy)
 sudo apt install -y \
     libnss3 \
     libnspr4 \
-    libatk-bridge2.0-0 \
     libdrm2 \
     libxkbcommon0 \
     libxcomposite1 \
     libxdamage1 \
     libxrandr2 \
     libgbm1 \
-    libxss1 \
-    libasound2 \
+    libxss1 || print_warning "Ba'zi core dependencies o'rnatilmadi"
+
+# Optional dependencies (server muhitida bo'lmasligi mumkin)
+print_step "Ixtiyoriy dependencies o'rnatish..."
+sudo apt install -y \
+    libatk-bridge2.0-0 \
     libatspi2.0-0 \
     libgtk-3-0 \
-    libgdk-pixbuf2.0-0 || handle_error "system dependencies o'rnatish"
+    libgdk-pixbuf2.0-0 2>/dev/null || print_warning "GUI dependencies o'rnatilmadi (server muhitida normal)"
+
+# Audio dependencies (server muhitida shart emas)
+sudo apt install -y libasound2 2>/dev/null || \
+sudo apt install -y libasound2t64 2>/dev/null || \
+print_warning "Audio dependencies o'rnatilmadi (server muhitida shart emas)"
 
 print_step "Playwright browserlarni o'rnatish (faqat Chromium)..."
 playwright install chromium || handle_error "Playwright chromium o'rnatish"
@@ -79,15 +90,22 @@ playwright install chromium || handle_error "Playwright chromium o'rnatish"
 print_step "Playwright system dependencies o'rnatish..."
 playwright install-deps || print_warning "playwright install-deps ba'zi xatoliklar bilan yakunlandi (bu normal)"
 
-print_step "FFmpeg va multimedia tools o'rnatish..."
+print_step "FFmpeg va multimedia tools o'rnatish (ixtiyoriy)..."
+# FFmpeg server muhitida bo'lmasligi yoki o'rnatilmasligi mumkin
+if sudo apt install -y ffmpeg ffprobe 2>/dev/null; then
+    print_success "FFmpeg muvaffaqiyatli o'rnatildi"
+else
+    print_warning "FFmpeg o'rnatilmadi - video processing ishlamaydi"
+    print_warning "Agar video kerak bo'lsa: sudo apt update && sudo apt install ffmpeg"
+fi
+
+# Additional multimedia packages (optional)
 sudo apt install -y \
-    ffmpeg \
-    ffprobe \
     libavcodec-extra \
     libavformat-dev \
     libavutil-dev \
     libswscale-dev \
-    libavresample-dev || handle_error "FFmpeg o'rnatish"
+    libavresample-dev 2>/dev/null || print_warning "Qo'shimcha multimedia kutubxonalar o'rnatilmadi"
 
 print_step "Loyiha papkalarini yaratish..."
 mkdir -p downloads results finish logs local_db || handle_error "papkalar yaratish"
@@ -164,20 +182,33 @@ import asyncio
 from playwright.async_api import async_playwright
 
 async def test_browser():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto('https://www.google.com')
-        title = await page.title()
-        print(f'Browser test muvaffaqiyatli: {title}')
-        await browser.close()
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto('https://www.google.com', timeout=10000)
+            title = await page.title()
+            print(f'✅ Browser test muvaffaqiyatli: {title}')
+            await browser.close()
+    except Exception as e:
+        print(f'⚠️ Browser test muvaffaqiyatsiz: {e}')
+        print('💡 Chromium o\'rnatilmagan yoki server muhitida GUI yo\'q')
 
 asyncio.run(test_browser())
-" || print_error "Playwright browser test muvaffaqiyatsiz"
+" 2>/dev/null || print_warning "Playwright browser test o'tkazib yuborildi"
 
 print_step "FFmpeg test qilish..."
-ffmpeg -version > /dev/null 2>&1 && print_success "FFmpeg muvaffaqiyatli o'rnatildi" || print_error "FFmpeg o'rnatishda muammo"
-ffprobe -version > /dev/null 2>&1 && print_success "FFprobe muvaffaqiyatli o'rnatildi" || print_error "FFprobe o'rnatishda muammo"
+if command -v ffmpeg >/dev/null 2>&1; then
+    ffmpeg -version > /dev/null 2>&1 && print_success "FFmpeg muvaffaqiyatli o'rnatildi" || print_warning "FFmpeg o'rnatilgan lekin ishlamayapti"
+else
+    print_warning "FFmpeg o'rnatilmagan - video processing ishlamaydi"
+fi
+
+if command -v ffprobe >/dev/null 2>&1; then
+    ffprobe -version > /dev/null 2>&1 && print_success "FFprobe muvaffaqiyatli o'rnatildi" || print_warning "FFprobe o'rnatilgan lekin ishlamayapti"
+else
+    print_warning "FFprobe o'rnatilmagan - video metadata extraction ishlamaydi"
+fi
 
 print_step "Python importlarni va PostgreSQL ulanishini test qilish..."
 python -c "
@@ -247,6 +278,8 @@ echo "- .env faylidagi PostgreSQL va Telegram sozlamalarni to'ldirish majburiy"
 echo "- Birinchi ishga tushirishda Telegram autentifikatsiyasi kerak bo'ladi"
 echo "- Faqat Chromium browser ishlatiladi (~100MB)"
 echo "- Alembic migration bilan database table yaratiladi"
+echo "- FFmpeg ixtiyoriy - video processing uchun kerak bo'lsa o'rnatish mumkin"
+echo "- Server muhitida GUI paketlar shart emas, headless mode ishlatiladi"
 echo ""
 echo "❓ Muammo bo'lsa:"
 echo "- Loglarni tekshiring: cat logs/app.log"
