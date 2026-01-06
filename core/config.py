@@ -14,6 +14,7 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "files_project")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_STATEMENT_TIMEOUT_MS = int(os.getenv("DB_STATEMENT_TIMEOUT_MS", "0"))
 
 # Legacy local database settings (deprecated - use PostgreSQL)
 # DB_LOCAL_NAME = os.getenv("DB_LOCAL_NAME", "local_files")
@@ -45,6 +46,10 @@ def get_db_engine_options():
         "echo": False,
     }
 
+def get_db_statement_timeout_ms() -> int:
+    """Return statement timeout in milliseconds (0 for unlimited)."""
+    return DB_STATEMENT_TIMEOUT_MS
+
 # Other configuration
 LOGGING_ENABLED = os.getenv(
     "LOGGING_ENABLED", "True").lower() in ("true", "1", "yes")
@@ -73,6 +78,12 @@ APP_CONFIG = {
 
     # --- Downloader Pagination ---
     "download_page_limit": int(os.getenv("DOWNLOAD_PAGE_LIMIT", "50")),
+
+    # --- Scraper Queue/Batch Settings ---
+    "scraper_queue_max": int(os.getenv("SCRAPER_QUEUE_MAX", "10000")),
+    "db_batch_timeout": float(os.getenv("DB_BATCH_TIMEOUT", "5")),
+    "db_max_retries": int(os.getenv("DB_MAX_RETRIES", "3")),
+    "db_cache_path": os.getenv("DB_CACHE_PATH", "logs/db_cache.jsonl"),
 
     # --- Timing Settings - Environment'dan o'qiladi ---
     "sleep_min": float(os.getenv("SLEEP_MIN", "0.5")),

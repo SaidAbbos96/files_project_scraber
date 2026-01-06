@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import time
 
-from core.config import get_database_url, get_db_engine_options
+from core.config import get_database_url, get_db_engine_options, get_db_statement_timeout_ms
 from core.models import File, Base
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,15 @@ class PostgreSQLFileDB:
     
     def _get_session(self) -> Session:
         """Get database session"""
-        return self.SessionLocal()
+        session = self.SessionLocal()
+        # Apply per-session statement timeout if configured
+        timeout_ms = get_db_statement_timeout_ms()
+        if timeout_ms and timeout_ms > 0:
+            try:
+                session.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
+            except Exception as e:
+                logger.warning(f"Failed to set statement_timeout: {e}")
+        return session
     
     def get_files(self, config_name: str, sort_by_size: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get all files for a config with optional sorting

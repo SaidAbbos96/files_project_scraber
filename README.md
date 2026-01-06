@@ -148,6 +148,7 @@ python main.py
 | 🧠 **Smart parsing** | Dynamic content extraction | BeautifulSoup4 4.14.2 + custom parsers |
 | 📊 **Real-time analytics** | Performance stats, success rates | Built-in metrics |
 | 🎯 **Quick/Interactive modes** | Flexible scraping options | User-friendly interface |
+| 🧰 **Queue + Batch DB writer** | Non-blocking scraping, disk cache fallback | `SCRAPER_QUEUE_MAX`, `CHECKPOINT_BATCH` |
 
 ### ⬇️ FileDownloader Module
 
@@ -179,7 +180,7 @@ python main.py
 
 | **Component** | **Responsibility** | **New Features** |
 |---------------|-------------------|------------------|
-| 🗃️ **FileDB** | Database management | Bulk upsert + paginated fetch + DB-side statistics |
+| 🗃️ **FileDB** | Database management | Bulk upsert + paginated fetch + DB-side statistics + statement timeout |
 | ⚙️ **Config** | Settings management | Environment-based configuration with .env support |
 | 📊 **Disk Monitor** | Space management | Real-time monitoring + alerts |
 | 📝 **Logger** | System logging | Timestamp-based unique logs with cleanup |
@@ -423,6 +424,14 @@ DB_POOL_PRE_PING=false
 DB_POOL_RECYCLE=1800
 DB_CONNECT_TIMEOUT=5
 DB_APPLICATION_NAME=files_project_scraber
+DB_STATEMENT_TIMEOUT_MS=60000
+
+# Scraper Queue/Batch Settings
+SCRAPER_QUEUE_MAX=10000
+CHECKPOINT_BATCH=300
+DB_BATCH_TIMEOUT=5
+DB_MAX_RETRIES=3
+DB_CACHE_PATH=logs/db_cache.jsonl
 \`\`\`
 
 ### 🔄 Database Migration
@@ -900,6 +909,16 @@ Doimiy disk joy nazorati:
 | **Avg Speed** | 12.5 pages/min | 2.3 MB/s | 45.3s/file |
 | **Error Rate** | 4.8% | 12.6% | 17.9% |
 | **Optimization** | ✅ Excellent | ⚠️ Good | 🔄 Needs tuning |
+
+### 🛠️ Maintenance
+
+Replay cached DB writes when the database was unavailable:
+
+```bash
+./venv/bin/python scripts/maintenance/replay_cache.py <config_name>
+```
+
+This command will bulk upsert items stored in `logs/db_cache.jsonl` for the given config and truncate the cache on success.
 
 ### 🔔 Smart Notifications
 

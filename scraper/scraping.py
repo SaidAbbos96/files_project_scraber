@@ -20,6 +20,8 @@ from tqdm import tqdm
 from .browser import launch_browser, cleanup_browser
 from .parsers.parse_file_pages import collect_links, scrape_page_list_safe
 from .workers import collect_items_parallel, ProcessingStats
+from .db_writer import AsyncDBWriter
+import asyncio
 
 
 class ScrapingOrchestrator:
@@ -32,6 +34,17 @@ class ScrapingOrchestrator:
         self.browser_config = browser_config
         self.db = FileDB()
         self.stats = ProcessingStats()
+        # In-memory queue and async DB writer
+        self.queue = asyncio.Queue(maxsize=self.config.get("scraper_queue_max", 10000))
+        self.db_writer = AsyncDBWriter(
+            db=self.db,
+            config_name=self.config.get("name", "unknown"),
+            queue=self.queue,
+            batch_size=int(self.config.get("checkpoint_batch", 100)),
+            cache_path=self.config.get("db_cache_path", "logs/db_cache.jsonl"),
+            batch_timeout=float(self.config.get("db_batch_timeout", 5)),
+            max_retries=int(self.config.get("db_max_retries", 3)),
+        )
 
     async def setup_browser(self) -> Tuple:
         """
@@ -135,12 +148,10 @@ class ScrapingOrchestrator:
             Tuple: (new_links, skipped_count)
         """
         try:
-            # Bulk check existing pages to minimize DB round-trips
-            candidate_pages = [it.get("file_page") for it in film_links if it.get("file_page")]
-            existing = self.db.get_existing_pages(self.config["name"], candidate_pages)
-
-            new_links = [it for it in film_links if it.get("file_page") and it["file_page"] not in existing]
-            skipped = len(film_links) - len(new_links)
+            # Non-blocking path: rely on DB upsert to de-duplicate
+            # We avoid querying DB here to keep scraper fast
+            new_links = [it for it in film_links if it.get("file_page")]
+            skipped = 0
 
             logger.info(f"🧠 DB'da mavjud {skipped} ta sahifa tashlab ketildi.")
             logger.info(f"📥 Yangi sahifalar soni: {len(new_links)}")
@@ -151,7 +162,7 @@ class ScrapingOrchestrator:
             logger.error(f"❌ DB filtrlashda xato: {e}")
             return film_links, 0
 
-    def insert_new_items(self, all_items: List[dict], skipped: int) -> int:
+    async def insert_new_items(self, all_items: List[dict], skipped: int) -> int:
         """
         Yangi yig'ilgan itemlarni DB ga yozadi.
 
@@ -163,9 +174,13 @@ class ScrapingOrchestrator:
             int: Qo'shilgan itemlar soni
         """
         try:
-            # Bulk upsert with batching to reduce transaction overhead
-            batch_size = int(self.config.get("checkpoint_batch", 100))
-            inserted = self.db.bulk_upsert_files(self.config["name"], all_items, batch_size=batch_size)
+            # Enqueue final collected items for async DB writer
+            inserted = 0
+            for it in all_items:
+                if self.queue.full():
+                    await asyncio.sleep(0.1)
+                await self.queue.put(it)
+                inserted += 1
 
             logger.info(
                 f"📂 {self.config['name']} uchun {inserted} ta yangi item qo'shildi, "
@@ -197,6 +212,9 @@ class ScrapingOrchestrator:
             if not selected_links:
                 return {"status": "cancelled", "reason": "No pages selected"}
 
+            # Start DB writer (non-blocking)
+            await self.db_writer.start()
+
             # 3. Film linklarini to'plash
             film_links = await self.collect_film_links(browser, selected_links)
             if not film_links:
@@ -216,8 +234,13 @@ class ScrapingOrchestrator:
             if not all_items:
                 return {"status": "failed", "reason": "No items collected"}
 
-            # 6. DB ga saqlash
-            inserted = self.insert_new_items(all_items, skipped)
+            # 6. DB ga saqlash (handled by async writer)
+            inserted = await self.insert_new_items(all_items, skipped)
+
+            # Wait for queue to drain and writer to flush pending
+            while not self.queue.empty():
+                await asyncio.sleep(0.2)
+            await self.db_writer.stop()
 
             self.stats.finish()
             stats_summary = self.stats.get_summary()
@@ -229,6 +252,7 @@ class ScrapingOrchestrator:
                 "processed": len(new_links),
                 "successful": len(all_items),
                 "inserted": inserted,
+                "db_processed": self.db_writer.processed_count,
                 "stats": stats_summary
             }
 
