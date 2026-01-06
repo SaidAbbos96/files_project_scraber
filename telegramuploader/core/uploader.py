@@ -425,6 +425,8 @@ class TelegramUploader:
                     progress_callback=progress,
                     attributes=attributes,  # 🎬 Video attributes qo'shish
                     force_document=False,   # Video'ni video sifatida yuborish
+                    workers=int(config.get("telegram_upload_workers", app_config.APP_CONFIG.get("telegram_upload_workers", 4))),
+                    part_size_kb=int(config.get("telegram_part_size_kb", app_config.APP_CONFIG.get("telegram_part_size_kb", 1024))),
                 )
 
             duration = time.time() - start_time

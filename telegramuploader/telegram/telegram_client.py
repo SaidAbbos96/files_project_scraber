@@ -31,10 +31,11 @@ Telegram_client = TelegramClient(
     str(session_path),
     api_id,
     api_hash,
-    connection_retries=3,
-    retry_delay=2,
-    timeout=30,
-    request_retries=2
+    connection_retries=config.TELEGRAM_CONNECTION_RETRIES,
+    retry_delay=config.TELEGRAM_RETRY_DELAY,
+    timeout=config.TELEGRAM_TIMEOUT,
+    request_retries=config.TELEGRAM_REQUEST_RETRIES,
+    flood_sleep_threshold=config.TELEGRAM_FLOOD_SLEEP_THRESHOLD,
 )
 
 

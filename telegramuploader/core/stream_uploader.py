@@ -200,6 +200,8 @@ class StreamingUploader:
                     parse_mode=None,  # ✅ HTML parsing ni o'chiramiz
                     supports_streaming=True,
                         progress_callback=progress,
+                        workers=int(config.get("telegram_upload_workers", 4)),
+                        part_size_kb=int(config.get("telegram_part_size_kb", 1024)),
                     )
 
             logger.info(f"✅ Telegram upload tugadi")

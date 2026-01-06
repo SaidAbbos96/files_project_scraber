@@ -111,6 +111,9 @@ APP_CONFIG = {
     # --- Telegram Settings - Environment'dan o'qiladi ---
     # Override default group
     "telegram_group": os.getenv("TELEGRAM_GROUP", None),
+    # Telethon upload tuning
+    "telegram_upload_workers": int(os.getenv("TELEGRAM_UPLOAD_WORKERS", "4")),
+    "telegram_part_size_kb": int(os.getenv("TELEGRAM_PART_SIZE_KB", "1024")),
 
     # --- Disk Monitoring Settings - Environment'dan o'qiladi ---
     "disk_monitor_enabled": os.getenv("DISK_MONITOR_ENABLED", "true").lower() in ("true", "1", "yes"),
@@ -165,6 +168,13 @@ FILES_GROUP_ID = os.getenv("FILES_GROUP_ID", "-1002699309226")
 FILES_GROUP_LINK = os.getenv(
     "FILES_GROUP_LINK", "https://t.me/+GGzAizSJb-g0MzQy")
 TELEGRAM_USER_IS_PREMIUM = os.getenv("TELEGRAM_USER_IS_PREMIUM", "true").lower() in ("true", "1", "yes")
+
+# Telethon client tuning (safe defaults if not in env)
+TELEGRAM_CONNECTION_RETRIES = int(os.getenv("TELEGRAM_CONNECTION_RETRIES", "5"))
+TELEGRAM_RETRY_DELAY = int(os.getenv("TELEGRAM_RETRY_DELAY", "2"))
+TELEGRAM_TIMEOUT = int(os.getenv("TELEGRAM_TIMEOUT", "60"))
+TELEGRAM_REQUEST_RETRIES = int(os.getenv("TELEGRAM_REQUEST_RETRIES", "3"))
+TELEGRAM_FLOOD_SLEEP_THRESHOLD = int(os.getenv("TELEGRAM_FLOOD_SLEEP_THRESHOLD", "60"))
 
 
 def make_config(site_config, overrides=None):
