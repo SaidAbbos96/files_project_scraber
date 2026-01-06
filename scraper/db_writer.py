@@ -74,7 +74,13 @@ class AsyncDBWriter:
                 # Backpressure observability: log queue size periodically
                 now = time.time()
                 if now - last_log > 2.0:
-                    logger.info(f"🧯 Queue size={self.queue.qsize()} buffer={len(buffer)}")
+                    # Use debug to avoid noisy zero logs; switch to info when active
+                    qsize = self.queue.qsize()
+                    bsize = len(buffer)
+                    if qsize > 0 or bsize > 0:
+                        logger.info(f"🧯 Queue size={qsize} buffer={bsize}")
+                    else:
+                        logger.debug("🧯 Writer idle (waiting for items)")
                     last_log = now
 
                 # If buffer is ready or timed out with items, flush
