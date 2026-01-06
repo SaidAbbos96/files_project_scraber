@@ -62,7 +62,7 @@ SITE_CONFIGS = {
         "base_url": "https://go4.ruhab.online/top-rated/",
         "pagination_selector": None,
         "pagination_link": "https://go4.ruhab.online/top-rated/{page}/",
-        "pagination_pages": 135,
+        "pagination_pages": 145,
         "card_selector": "#list_videos_common_videos_list_items div.item.thumb.video-block",
         "fields": {
             "title": ".video-title-holder h1::text",
