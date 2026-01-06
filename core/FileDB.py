@@ -1,7 +1,7 @@
 """
 PostgreSQL-based FileDB implementation using SQLAlchemy
 """
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime
 from sqlalchemy import create_engine, func, desc, asc, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 import logging
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 from core.config import get_database_url, get_db_engine_options, get_db_statement_timeout_ms
 from core.models import File, Base
@@ -58,6 +59,63 @@ class PostgreSQLFileDB:
             except Exception as e:
                 logger.warning(f"Failed to set statement_timeout: {e}")
         return session
+
+    @staticmethod
+    def _normalize_url(url: Optional[str]) -> Optional[str]:
+        """Normalize URLs for consistent de-duplication.
+
+        - Strips whitespace
+        - Lowercases scheme and host (netloc)
+        - Removes URL fragment
+        - Removes trailing slash if path isn't just '/'
+        """
+        if not url:
+            return None
+        s = str(url).strip()
+        if not s:
+            return None
+        try:
+            parts = urlsplit(s)
+            scheme = (parts.scheme or '').lower()
+            netloc = (parts.netloc or '').lower()
+            path = parts.path or ''
+            # Drop fragment
+            fragment = ''
+            query = parts.query or ''
+            # Remove trailing slash for non-root paths
+            if path.endswith('/') and path != '/':
+                path = path.rstrip('/')
+            return urlunsplit((scheme, netloc, path, query, fragment))
+        except Exception:
+            return s
+
+    @staticmethod
+    def _sanitize_item_for_limits(item: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure values fit column limits to avoid DataError (value too long).
+
+        Truncates only limited VARCHAR columns; TEXT columns are left as-is.
+        """
+        if item is None:
+            return {}
+        out = dict(item)
+        # Truncate to match models.File constraints
+        def trunc(v, n):
+            if v is None:
+                return None
+            s = str(v)
+            return s[:n]
+
+        # Basic normalization and truncation
+        cfg = out.get("config_name")
+        out["config_name"] = trunc(cfg.strip() if isinstance(cfg, str) else cfg, 255)
+        # Normalize file_page URL for stable de-duplication
+        out["file_page"] = PostgreSQLFileDB._normalize_url(out.get("file_page"))
+        out["language"] = trunc(out.get("language", "uz"), 10)
+        out["year"] = trunc(out.get("year"), 4)
+        out["country"] = trunc(out.get("country"), 255)
+        out["mime"] = trunc(out.get("mime"), 255)
+        out["telegram_type"] = trunc(out.get("telegram_type"), 50)
+        return out
     
     def get_files(self, config_name: str, sort_by_size: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get all files for a config with optional sorting
@@ -105,23 +163,24 @@ class PostgreSQLFileDB:
             ID of inserted file
         """
         with self._get_session() as session:
+            clean = self._sanitize_item_for_limits({**item, "config_name": config_name})
             ins = pg_insert(File).values(
-                config_name=config_name,
-                file_page=item.get("file_page"),
-                title=item.get("title"),
-                categories=item.get("categories"),
-                language=item.get("language", "uz"),
-                description=item.get("description"),
-                file_url=item.get("file_url"),
-                image=item.get("image"),
-                year=item.get("year"),
-                country=item.get("country"),
-                actors=item.get("actors"),
-                local_path=item.get("local_path"),
-                file_size=item.get("file_size"),
-                mime=item.get("mime"),
-                telegram_type=item.get("telegram_type"),
-                uploaded=bool(item.get("uploaded", False)),
+                config_name=clean.get("config_name"),
+                file_page=clean.get("file_page"),
+                title=clean.get("title"),
+                categories=clean.get("categories"),
+                language=clean.get("language", "uz"),
+                description=clean.get("description"),
+                file_url=clean.get("file_url"),
+                image=clean.get("image"),
+                year=clean.get("year"),
+                country=clean.get("country"),
+                actors=clean.get("actors"),
+                local_path=clean.get("local_path"),
+                file_size=clean.get("file_size"),
+                mime=clean.get("mime"),
+                telegram_type=clean.get("telegram_type"),
+                uploaded=bool(clean.get("uploaded", False)),
                 created_at=func.now(),
             )
 
@@ -170,25 +229,32 @@ class PostgreSQLFileDB:
             for i in range(0, len(items), batch_size):
                 chunk = items[i:i + batch_size]
                 t0 = time.time()
+                # De-duplicate within-batch by (config_name, file_page)
+                seen: Set[Tuple[str, Optional[str]]] = set()
                 values = []
                 for item in chunk:
+                    clean = self._sanitize_item_for_limits({**item, "config_name": config_name})
+                    key = (clean.get("config_name"), clean.get("file_page"))
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     values.append({
-                        "config_name": config_name,
-                        "file_page": item.get("file_page"),
-                        "title": item.get("title"),
-                        "categories": item.get("categories"),
-                        "language": item.get("language", "uz"),
-                        "description": item.get("description"),
-                        "file_url": item.get("file_url"),
-                        "image": item.get("image"),
-                        "year": item.get("year"),
-                        "country": item.get("country"),
-                        "actors": item.get("actors"),
-                        "local_path": item.get("local_path"),
-                        "file_size": item.get("file_size"),
-                        "mime": item.get("mime"),
-                        "telegram_type": item.get("telegram_type"),
-                        "uploaded": bool(item.get("uploaded", False)),
+                        "config_name": clean.get("config_name"),
+                        "file_page": clean.get("file_page"),
+                        "title": clean.get("title"),
+                        "categories": clean.get("categories"),
+                        "language": clean.get("language", "uz"),
+                        "description": clean.get("description"),
+                        "file_url": clean.get("file_url"),
+                        "image": clean.get("image"),
+                        "year": clean.get("year"),
+                        "country": clean.get("country"),
+                        "actors": clean.get("actors"),
+                        "local_path": clean.get("local_path"),
+                        "file_size": clean.get("file_size"),
+                        "mime": clean.get("mime"),
+                        "telegram_type": clean.get("telegram_type"),
+                        "uploaded": bool(clean.get("uploaded", False)),
                         "created_at": func.now(),
                     })
 

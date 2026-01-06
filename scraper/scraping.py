@@ -148,10 +148,12 @@ class ScrapingOrchestrator:
             Tuple: (new_links, skipped_count)
         """
         try:
-            # Non-blocking path: rely on DB upsert to de-duplicate
-            # We avoid querying DB here to keep scraper fast
-            new_links = [it for it in film_links if it.get("file_page")]
-            skipped = 0
+            # Use DB-side existence check to skip already-known pages
+            pages = [it.get("file_page") for it in film_links if it.get("file_page")]
+            existing = self.db.get_existing_pages(self.config.get("name", "unknown"), pages)
+
+            new_links = [it for it in film_links if it.get("file_page") and it.get("file_page") not in existing]
+            skipped = len(pages) - len(new_links)
 
             logger.info(f"🧠 DB'da mavjud {skipped} ta sahifa tashlab ketildi.")
             logger.info(f"📥 Yangi sahifalar soni: {len(new_links)}")

@@ -1,6 +1,7 @@
 from copy import deepcopy
 import os
 from pathlib import Path as PathlibPath
+from urllib.parse import quote_plus
 
 # .env faylni yuklash
 from dotenv import load_dotenv
@@ -22,11 +23,16 @@ DB_STATEMENT_TIMEOUT_MS = int(os.getenv("DB_STATEMENT_TIMEOUT_MS", "0"))
 
 def get_database_url():
     """Get PostgreSQL database URL from environment variables"""
-    return f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    # URL-encode user/pass to support special characters
+    user_enc = quote_plus(DB_USER) if DB_USER is not None else ""
+    pwd_enc = quote_plus(DB_PASSWORD) if DB_PASSWORD is not None else ""
+    return f"postgresql://{user_enc}:{pwd_enc}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 def get_async_database_url():
     """Get async PostgreSQL database URL from environment variables"""
-    return f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    user_enc = quote_plus(DB_USER) if DB_USER is not None else ""
+    pwd_enc = quote_plus(DB_PASSWORD) if DB_PASSWORD is not None else ""
+    return f"postgresql+asyncpg://{user_enc}:{pwd_enc}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 def get_db_engine_options():
     """Engine options for SQLAlchemy, configurable via env."""
@@ -158,7 +164,7 @@ TELEGRAM_PHONE_NUMBER = os.getenv("TELEGRAM_PHONE_NUMBER", "+998200089990")
 FILES_GROUP_ID = os.getenv("FILES_GROUP_ID", "-1002699309226")
 FILES_GROUP_LINK = os.getenv(
     "FILES_GROUP_LINK", "https://t.me/+GGzAizSJb-g0MzQy")
-TELEGRAM_USER_IS_PREMIUM = os.getenv("TELEGRAM_USER_IS_PREMIUM", True)
+TELEGRAM_USER_IS_PREMIUM = os.getenv("TELEGRAM_USER_IS_PREMIUM", "true").lower() in ("true", "1", "yes")
 
 
 def make_config(site_config, overrides=None):
