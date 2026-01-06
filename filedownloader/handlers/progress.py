@@ -89,6 +89,22 @@ class ProgressHandler:
             f"✅{self.completed_files} ♻️{self.existing_files} ❌{self.failed_files} ⏭️{self.skipped_files} | "
             f"{eta_str}"
         )
+
+    def update_batch_results(self, results: List[Dict[str, Any]]):
+        """Update counters based on a batch of download results and log progress."""
+        for r in results:
+            status = r.get("status")
+            if status == "success":
+                self.completed_files += 1
+                self.downloaded_bytes += r.get("file_size", 0) or 0
+            elif status == "failed":
+                self.failed_files += 1
+            elif status == "skipped":
+                self.skipped_files += 1
+            elif status == "exists":
+                self.existing_files += 1
+                self.downloaded_bytes += r.get("file_size", 0) or 0
+        self._log_progress()
     
     def get_session_summary(self) -> Dict[str, Any]:
         """Session summary statistikalarini olish"""

@@ -154,6 +154,7 @@ python main.py
 | **Feature** | **Description** | **Configuration** |
 |-------------|-----------------|-------------------|
 | 🚀 **Parallel downloads** | 2 concurrent downloads | `download_concurrency: 2` |
+| 📦 **Paginated fetch** | Batched DB reads | `download_page_limit: 50` |
 | 📈 **Sequential mode** | One-by-one downloading | `mode: "sequential"` |
 | 💾 **Disk monitoring** | Auto space management | `min_free_space_gb: 1.0` |
 | 🔄 **Auto cleanup** | Remove old files (1h+) | `file_max_age_hours: 1` |
@@ -178,7 +179,7 @@ python main.py
 
 | **Component** | **Responsibility** | **New Features** |
 |---------------|-------------------|------------------|
-| 🗃️ **FileDB** | Database management | Statistics methods: `get_files_count()`, `get_downloaded_files_count()` |
+| 🗃️ **FileDB** | Database management | Bulk upsert + paginated fetch + DB-side statistics |
 | ⚙️ **Config** | Settings management | Environment-based configuration with .env support |
 | 📊 **Disk Monitor** | Space management | Real-time monitoring + alerts |
 | 📝 **Logger** | System logging | Timestamp-based unique logs with cleanup |
@@ -196,6 +197,7 @@ files_project_scraber/
 │
 ├── 🧠 core/                   # Core functionality
 │   ├── config.py             # Global configuration + PostgreSQL settings
+│                              # (+ engine tuning via env)
 │   ├── models.py             # SQLAlchemy database models
 │   ├── PostgreSQLFileDB.py   # PostgreSQL database implementation
 │   ├── FileDB.py             # Legacy SQLite wrapper (backward compatibility)
@@ -412,6 +414,15 @@ DOWNLOAD_CONCURRENCY=2
 SCRAPE_CONCURRENCY=5
 HEADLESS=1
 MODE=parallel
+DOWNLOAD_PAGE_LIMIT=50
+
+# Advanced DB Engine Tuning (remote PostgreSQL)
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_PRE_PING=false
+DB_POOL_RECYCLE=1800
+DB_CONNECT_TIMEOUT=5
+DB_APPLICATION_NAME=files_project_scraber
 \`\`\`
 
 ### 🔄 Database Migration

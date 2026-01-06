@@ -1,7 +1,7 @@
 """
 SQLAlchemy models for PostgreSQL database
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, BigInteger, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -12,6 +12,14 @@ Base = declarative_base()
 class File(Base):
     """File model for storing file information"""
     __tablename__ = "files"
+    __table_args__ = (
+        # Uniqueness for fast de-duplication and upsert
+        Index("ix_files_config_page_unique", "config_name", "file_page", unique=True),
+        # Helpful indexes for common filters
+        Index("ix_files_config_uploaded", "config_name", "uploaded"),
+        Index("ix_files_config_local_path", "config_name", "local_path"),
+        Index("ix_files_config_size", "config_name", "file_size"),
+    )
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     config_name = Column(String(255), nullable=False, index=True)

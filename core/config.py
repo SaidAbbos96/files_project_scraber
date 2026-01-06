@@ -27,6 +27,24 @@ def get_async_database_url():
     """Get async PostgreSQL database URL from environment variables"""
     return f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+def get_db_engine_options():
+    """Engine options for SQLAlchemy, configurable via env."""
+    pool_size = int(os.getenv("DB_POOL_SIZE", "10"))
+    max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+    pool_pre_ping = os.getenv("DB_POOL_PRE_PING", "false").lower() in ("true", "1", "yes")
+    pool_recycle = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+    connect_timeout = int(os.getenv("DB_CONNECT_TIMEOUT", "5"))
+    application_name = os.getenv("DB_APPLICATION_NAME", "files_project_scraber")
+
+    return {
+        "pool_size": pool_size,
+        "max_overflow": max_overflow,
+        "pool_pre_ping": pool_pre_ping,
+        "pool_recycle": pool_recycle,
+        "connect_args": {"connect_timeout": connect_timeout, "application_name": application_name},
+        "echo": False,
+    }
+
 # Other configuration
 LOGGING_ENABLED = os.getenv(
     "LOGGING_ENABLED", "True").lower() in ("true", "1", "yes")
@@ -52,6 +70,9 @@ APP_CONFIG = {
     "download_chunk_size": int(os.getenv("DOWNLOAD_CHUNK_SIZE", "262144")),
     "upload_concurrency": int(os.getenv("UPLOAD_CONCURRENCY", "2")),
     "upload_workers": int(os.getenv("UPLOAD_WORKERS", "2")),
+
+    # --- Downloader Pagination ---
+    "download_page_limit": int(os.getenv("DOWNLOAD_PAGE_LIMIT", "50")),
 
     # --- Timing Settings - Environment'dan o'qiladi ---
     "sleep_min": float(os.getenv("SLEEP_MIN", "0.5")),

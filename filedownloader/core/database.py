@@ -14,7 +14,7 @@ class FileDownloaderDB:
     def __init__(self):
         self.db = FileDB()
     
-    def get_files_for_download(self, site_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_files_for_download(self, site_name: str, limit: Optional[int] = None, last_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Download uchun fayllarni olish (faqat yuklanmagan fayllar)
         
@@ -26,7 +26,10 @@ class FileDownloaderDB:
             List of files ready for download
         """
         # To'g'ridan-to'g'ri database'dan yuklanmagan fayllarni olish
-        download_needed = self.db.get_undownloaded_files(site_name, limit)
+        if last_id is not None and limit is not None:
+            download_needed = self.db.get_undownloaded_files_paginated(site_name, last_id, limit)
+        else:
+            download_needed = self.db.get_undownloaded_files(site_name, limit)
         
         logger.info(f"📂 {len(download_needed)} fayl download uchun tayyor (yuklanmagan)")
         return download_needed
@@ -93,23 +96,4 @@ class FileDownloaderDB:
         Returns:
             Statistics dictionary
         """
-        all_files = self.db.get_files(site_name)
-        
-        total_files = len(all_files)
-        downloaded = len([f for f in all_files if f.get("local_path")])
-        pending = len([f for f in all_files if not f.get("local_path") and f.get("file_url")])
-        no_url = len([f for f in all_files if not f.get("file_url")])
-        
-        total_size = sum(f.get("file_size", 0) for f in all_files if f.get("file_size"))
-        downloaded_size = sum(f.get("file_size", 0) for f in all_files if f.get("local_path") and f.get("file_size"))
-        
-        return {
-            "total_files": total_files,
-            "downloaded": downloaded,
-            "pending": pending,
-            "no_url": no_url,
-            "download_rate": (downloaded / total_files * 100) if total_files else 0,
-            "total_size_gb": total_size / (1024**3),
-            "downloaded_size_gb": downloaded_size / (1024**3),
-            "pending_size_gb": (total_size - downloaded_size) / (1024**3)
-        }
+        return self.db.get_download_statistics(site_name)

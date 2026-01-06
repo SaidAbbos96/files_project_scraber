@@ -135,18 +135,12 @@ class ScrapingOrchestrator:
             Tuple: (new_links, skipped_count)
         """
         try:
-            new_links, skipped = [], 0
+            # Bulk check existing pages to minimize DB round-trips
+            candidate_pages = [it.get("file_page") for it in film_links if it.get("file_page")]
+            existing = self.db.get_existing_pages(self.config["name"], candidate_pages)
 
-            for item in film_links:
-                file_page = item.get("file_page")
-                if not file_page:
-                    continue
-
-                if self.db.file_exists(self.config["name"], file_page):
-                    skipped += 1
-                    continue
-
-                new_links.append(item)
+            new_links = [it for it in film_links if it.get("file_page") and it["file_page"] not in existing]
+            skipped = len(film_links) - len(new_links)
 
             logger.info(f"🧠 DB'da mavjud {skipped} ta sahifa tashlab ketildi.")
             logger.info(f"📥 Yangi sahifalar soni: {len(new_links)}")
@@ -169,14 +163,9 @@ class ScrapingOrchestrator:
             int: Qo'shilgan itemlar soni
         """
         try:
-            inserted = 0
-
-            for item in all_items:
-                if not item.get("file_page"):
-                    continue
-
-                self.db.insert_file(self.config["name"], item)
-                inserted += 1
+            # Bulk upsert with batching to reduce transaction overhead
+            batch_size = int(self.config.get("checkpoint_batch", 100))
+            inserted = self.db.bulk_upsert_files(self.config["name"], all_items, batch_size=batch_size)
 
             logger.info(
                 f"📂 {self.config['name']} uchun {inserted} ta yangi item qo'shildi, "

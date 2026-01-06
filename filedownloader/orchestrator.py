@@ -63,18 +63,45 @@ class FileDownloaderOrchestrator:
         """
         logger.info(f"📂 Starting download session for: {site_name}")
         
-        # Get files to download
-        files = self.db.get_files_for_download(site_name, limit)
-        
-        if not files:
-            logger.warning(f"⚠️ No files found for download: {site_name}")
-            return {"status": "no_files", "total": 0}
-        
-        # Debug mode - select single file
+        # Determine pending total via DB-side stats to avoid loading all rows
+        stats_overview = self.get_download_statistics(site_name)
+        pending_total = stats_overview.get("pending", 0)
+
+        # Page size for paginated fetches
+        page_size = int(self.config.get("download_page_limit", 50))
+
+        # Desired total to process in this session
+        desired_total = min(pending_total, limit) if isinstance(limit, int) else pending_total
+
+        # Debug mode: fetch first page then select single file
         if debug_mode:
+            files = self.db.get_files_for_download(site_name, limit=page_size, last_id=None)
+            if not files:
+                logger.warning(f"⚠️ No files found for download: {site_name}")
+                return {"status": "no_files", "total": 0}
             files = await self._debug_file_selection(files)
             if not files:
                 return {"status": "cancelled", "total": 0}
+            desired_total = len(files)
+            batches = [files]
+        else:
+            # Build batches using pagination until desired_total reached
+            batches = []
+            last_id = None
+            processed = 0
+            while processed < desired_total:
+                remaining = desired_total - processed
+                batch_limit = min(page_size, remaining)
+                files = self.db.get_files_for_download(site_name, limit=batch_limit, last_id=last_id)
+                if not files:
+                    break
+                batches.append(files)
+                last_id = files[-1].get("id", last_id)
+                processed += len(files)
+            
+            if processed == 0:
+                logger.warning(f"⚠️ No files found for download: {site_name}")
+                return {"status": "no_files", "total": 0}
         
         # Ensure download directory exists
         download_dir = self.config["download_dir"]
@@ -85,8 +112,8 @@ class FileDownloaderOrchestrator:
         if cleaned > 0:
             logger.info(f"🧹 Cleaned {cleaned} incomplete files")
         
-        # Start progress tracking
-        self.progress_handler.start_session(len(files))
+        # Start progress tracking with desired_total estimate
+        self.progress_handler.start_session(desired_total)
         
         # Get download concurrency
         concurrency = self.config.get("download_concurrency", 3)
@@ -94,12 +121,17 @@ class FileDownloaderOrchestrator:
         
         logger.info(f"⚡ Download concurrency: {concurrency}")
         
-        # Execute downloads
+        # Execute downloads in batches
+        combined_results = []
         async with aiohttp.ClientSession() as session:
-            results = await self.producer.batch_process(session, semaphore, files, self.config)
+            for files in batches:
+                batch_results = await self.producer.batch_process(session, semaphore, files, self.config)
+                combined_results.extend(batch_results)
+                # Update progress after each batch
+                self.progress_handler.update_batch_results(batch_results)
         
-        # Process results
-        stats = self.consumer.batch_process_results(results, self.config)
+        # Process results once for all combined batches
+        stats = self.consumer.batch_process_results(combined_results, self.config)
         
         # Log summaries
         self.progress_handler.log_session_summary()
@@ -108,8 +140,8 @@ class FileDownloaderOrchestrator:
         # Prepare return data
         return {
             "status": "completed",
-            "total": len(files),
-            "results": results,
+            "total": len(combined_results),
+            "results": combined_results,
             "statistics": stats,
             "progress": self.progress_handler.get_session_summary(),
             "errors": self.error_handler.get_error_summary()
