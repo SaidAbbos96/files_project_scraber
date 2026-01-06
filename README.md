@@ -1,5 +1,329 @@
 # 🎬 Files Project Scraper
 
+> Postgres + Playwright + Telethon asosida professional scraping → download → Telegram upload pipeline
+
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Playwright](https://img.shields.io/badge/playwright-1.55.0-green.svg)](https://playwright.dev/)
+[![Telethon](https://img.shields.io/badge/telethon-1.41.2-blue.svg)](https://github.com/LonamiWebs/Telethon)
+[![PostgreSQL](https://img.shields.io/badge/postgresql-13+-blue.svg)](https://www.postgresql.org/)
+[![SQLAlchemy](https://img.shields.io/badge/sqlalchemy-2.0+-green.svg)](https://www.sqlalchemy.org/)
+[![FFmpeg](https://img.shields.io/badge/ffmpeg-python-red.svg)](https://github.com/kkroening/ffmpeg-python)
+
+## 📋 Mundarija
+
+- [🎯 Loyiha haqida](#-loyiha-haqida)
+- [🎮 Interaktiv Menu](#-interaktiv-menu)
+- [✨ Imkoniyatlar](#-imkoniyatlar)
+- [🩺 Diagnostics](#-diagnostics)
+- [🏗️ Arxitektura](#️-arxitektura)
+- [🛠️ Texnologiyalar](#️-texnologiyalar)
+- [📦 O'rnatish](#-ornatish)
+- [⚙️ Sozlash](#️-sozlash)
+- [🚀 Ishga tushirish](#-ishga-tushirish)
+- [📦 Modullar](#-modullar)
+- [🛡️ Operatsiyalar](#-operatsiyalar)
+- [❓ Troubleshooting](#-troubleshooting)
+
+---
+
+## 🎯 Loyiha haqida
+
+Files Project Scraper — config-first yondashuvdagi to‘liq pipeline:
+
+- Scraper: sahifa list → film sahifasi → meta + fayl URL + rasm
+- Downloader: parallel yuklab olish, pagination, disk monitoring
+- Telegram Uploader: classic va streaming upload, video metadata, auto-cleanup
+- PostgreSQL: UPSERT, indekslar, batching; Alembic migratsiyalar
+- Observability: tqdm progress, diagnostika, loglar, batch/queue metrikalari
+
+Asosiy maqsad: WAN kechikishda ham barqaror. Scraper DB’ni kutmaydi — DB yozish asinxron batch writer orqali; uzilishlarda disk kesh fallback mavjud.
+
+### 🎭 Modullar
+
+| Modul | Vazifa | Texnologiya |
+|---|---|---|
+| 🕷️ Scraper | Web scraping, parallel sahifa tahlili | Playwright, aiohttp, asyncio |
+| ⬇️ Downloader | Fayl yuklab olish, progress | aiohttp, tqdm, disk monitor |
+| ⬆️ Uploader | Telegram upload (klassik/stream) | Telethon, FFmpeg |
+| 💾 Core | DB, config, models | PostgreSQL, SQLAlchemy, Alembic |
+| 🛠️ Utils | Logger, diagnostika, yordamchilar | Python util-lar |
+
+---
+
+## 🎮 Interaktiv Menu
+
+`python main.py` — interaktiv menyu orqali quyidagi rejimlar:
+
+1) Scraping only — faqat ma’lumot yig‘ish (DB’ga asinxron yoziladi)
+2) Download — DB’dagi fayllarni yuklab olish, pagination bilan
+3) Download + Upload — ketma-ket (yoki parallel) ishlov
+4) Upload only — faqat Telegramga yuklash (classic/stream)
+
+Har bir rejim loglari `logs/` ichida saqlanadi, natijalar `results/` va fayllar `downloads/` ichida.
+
+---
+
+## ✨ Imkoniyatlar
+
+- PostgreSQL + Alembic: migratsiyalar, unique constraint va indekslar
+- Async DB writer: batching, retry/backoff, per-session statement timeout
+- Disk kesh fallback: DB yo‘q bo‘lsa `logs/db_cache.jsonl`ga yozib, keyin replay
+- URL normalizatsiya + UPSERT: `(config_name, file_page)` bo‘yicha dublikatlar yo‘q
+- Downloader: pagination (`DOWNLOAD_PAGE_LIMIT`), `last_id` bilan samarali iteratsiya
+- Uploader: Telethon `workers` + `part_size_kb` bilan tez upload; streaming
+- Video optimizatsiya: FFmpeg metadata (duration, width/height, thumb) qo‘llab-quvvatlanadi
+
+---
+
+## 🩺 Diagnostics
+
+`scripts/diagnostics/` va `logs/system_diagnostics_*.txt` orqali tizim holati ko‘rinadi.
+
+Qamrov:
+- Disk holati, bo‘sh joy, katta fayllar
+- Tarmoq holati, DNS, kechikishlar
+- DB ulanish, pool holati, retry statistikasi
+- Uploader/scraper ish faoliyati, progress metrikalari
+
+---
+
+## 🏗️ Arxitektura
+
+Muvofiqlashtirilgan modullar va yagona DB qatlami:
+
+- Global engine/sessionmaker (Postgres): bitta pool — barcha modullar uchun
+- UPSERT (ON CONFLICT (config_name, file_page)): dublikatlar kirmaydi
+- URL normalizatsiya (scheme/host lower; fragment olib tashlanadi; trailing slash yo‘q)
+- Async DB writer: asyncio.Queue → batch upsert; retry/backoff; disk kesh fallback
+- Downloader: paginated fetch — “fetch all” yo‘q
+- Uploader: Telethon `send_file` workers + part_size; streaming; `uploaded=True` + `uploaded_at`
+- Per-session `SET LOCAL statement_timeout` — uzun querylar cheklanadi
+
+---
+
+## 🛠️ Texnologiyalar
+
+- Python 3.12, asyncio, aiohttp, Playwright (Chromium only)
+- Telethon, FFmpeg-python
+- PostgreSQL 13+, SQLAlchemy 2.x, Alembic
+- tqdm, rich logging, system diagnostics
+
+---
+
+## 📦 O‘rnatish
+
+1) Python va venv
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -U pip
+pip install -r requirements.txt
+```
+
+2) Playwright (Chromium)
+```bash
+python -m playwright install chromium
+python -m playwright install-deps
+```
+
+3) FFmpeg
+- Linux: `sudo apt-get install -y ffmpeg`
+
+4) PostgreSQL ulanishi va migratsiya
+```bash
+# .env ni to‘ldiring (quyida qarang), keyin
+alembic upgrade head
+```
+
+---
+
+## ⚙️ Sozlash
+
+`.env` namunasi:
+
+```bash
+# ========================================
+# DATABASE CONFIGURATION (PostgreSQL)
+# ========================================
+DB_HOST=your_db_host
+DB_PORT=5432
+DB_NAME=files_scraber_db
+DB_USER=postgres
+DB_PASSWORD="your_password_with#symbols"   # Parol va user URL-encode qilinadi
+
+# Engine tuning (remote Postgres)
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_PRE_PING=false
+DB_POOL_RECYCLE=1800
+DB_CONNECT_TIMEOUT=5
+DB_APPLICATION_NAME=files_project_scraber
+DB_STATEMENT_TIMEOUT_MS=60000      # per-session SET LOCAL statement_timeout
+
+# ========================================
+# TELEGRAM API & UPLOAD TUNING
+# ========================================
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE_NUMBER=+998901234567
+FILES_GROUP_ID=-1002699309226
+FILES_GROUP_LINK=https://t.me/your_group
+
+# Telethon client tuning
+TELEGRAM_CONNECTION_RETRIES=5
+TELEGRAM_RETRY_DELAY=2
+TELEGRAM_TIMEOUT=120
+TELEGRAM_REQUEST_RETRIES=3
+TELEGRAM_FLOOD_SLEEP_THRESHOLD=90
+
+# Upload performance
+TELEGRAM_UPLOAD_WORKERS=4
+TELEGRAM_PART_SIZE_KB=1024
+
+# ========================================
+# APP SETTINGS
+# ========================================
+WORKER_NAME=worker_001
+HEADLESS=1
+MODE=parallel                      # parallel | sequential
+
+# Concurrency
+SCRAPE_CONCURRENCY=5
+DOWNLOAD_CONCURRENCY=2
+UPLOAD_CONCURRENCY=2
+UPLOAD_WORKERS=2
+
+# Scraper Queue/Batch Settings (DB writer)
+SCRAPER_QUEUE_MAX=10000
+CHECKPOINT_BATCH=300
+DB_BATCH_TIMEOUT=5
+DB_MAX_RETRIES=3
+DB_CACHE_PATH=logs/db_cache.jsonl
+
+# Downloader pagination
+DOWNLOAD_PAGE_LIMIT=50
+```
+
+Eslatma: `.env` bo‘lmasa ham xavfsiz defaultlar qo‘yilgan; DB user/parol URL-encode qilinadi.
+
+---
+
+## 🚀 Ishga tushirish
+
+Interaktiv menyu:
+```bash
+python main.py
+```
+
+To‘g‘ridan-to‘g‘ri modul ishlatish misollari `scripts/` ichida mavjud (testing/maintenance/diagnostics).
+
+---
+
+## 📦 Modullar
+
+### ⬇️ FileDownloader
+- Parallel yuklab olish, progress, qayta urinishlar
+- Disk monitoring va minimal bo‘sh joy tekshiruvi
+- Natijalar `results/`, fayllar `downloads/`
+
+### ⬆️ TelegramUploader
+- Classic va Streaming upload
+- Telethon tuning: `workers`, `part_size_kb`, retry/timeout/flood-sleep
+- `uploaded=True` va `uploaded_at` belgilash, muvaffaqiyatli jo‘natilgandan keyin
+
+### 💾 Core
+- `core/config.py`: `.env` yuklash, DB URL builder (URL-encoding), app config
+- `core/FileDB.py`: global engine, UPSERT, pagination, sanitizatsiya (VARCHAR truncate)
+- `core/models.py`: `files` jadvali, unique va indekslar
+
+### 🛠️ Utils
+- Logger, diagnostika, helper funksiyalar
+
+---
+
+## 🛡️ Operatsiyalar
+
+### Disk keshini qayta yozish (DB tiklangandan keyin)
+```bash
+python scripts/maintenance/replay_cache.py <config_name>
+```
+
+### Tarixiy dublikatlarni tozalash (bir martalik)
+```sql
+WITH ranked AS (
+   SELECT id, config_name, file_page,
+             ROW_NUMBER() OVER (PARTITION BY config_name, file_page ORDER BY id DESC) AS rn
+   FROM files
+)
+DELETE FROM files f
+USING ranked r
+WHERE f.id = r.id AND r.rn > 1;
+```
+
+### Alembic migratsiyalar
+```bash
+alembic upgrade head
+# yangi model o‘zgarishlari uchun (zarur bo‘lsa):
+alembic revision --autogenerate -m "description"
+alembic upgrade head
+```
+
+---
+
+## ❓ Troubleshooting
+
+- Dublikatlar kirmoqda:
+   - URL normalizatsiya (scheme/host lower, fragment/trailing slash olib tashlash) yoqilganmi?
+   - Unique `(config_name, file_page)` indeksi Alembic orqali o‘rnatilganmi?
+   - Tarixiy dublikatlar uchun yuqoridagi SQL’ni ishga tushiring.
+
+- DB sekin / “lock-up”:
+   - Async DB writer queue ishlatiladi; `SCRAPER_QUEUE_MAX`, `CHECKPOINT_BATCH`, `DB_BATCH_TIMEOUT` ni sozlang.
+   - `DB_STATEMENT_TIMEOUT_MS` bilan uzun querylarni cheklang.
+
+- DB o‘chib qolsa:
+   - Yozuvlar `logs/db_cache.jsonl` ga keshlanadi. Tiklangach `replay_cache.py` bilan DB’ga qayta yozing.
+
+- Telegram streamingda status o‘zgarmaydi:
+   - Streaming yo‘lida `uploaded=True` DB’ga yozish tuzatildi; yangilangan kodni ishga tushiring.
+
+- Parolda maxsus belgilar bor:
+   - `.env` dagi user/parol avtomatik URL-encode qilinadi — qo‘shimcha qadam talab qilinmaydi.
+
+---
+
+## 🗃️ Muhim fayllar
+
+| Fayl | Maqsad |
+|---|---|
+| `main.py` | Interaktiv menyu, entry point |
+| `core/config.py` | Konfiguratsiya va DB URL builder |
+| `core/FileDB.py` | Postgres DB qatlami (UPSERT, batching, pagination) |
+| `telegramuploader/core/uploader.py` | Classic uploader |
+| `telegramuploader/core/stream_uploader.py` | Streaming uploader |
+| `scraper/scraping.py` | Scraping orchestratsiyasi |
+| `scripts/` | Diagnostics, maintenance, testing |
+| `logs/` | Loglar, `db_cache.jsonl` |
+| `downloads/` | Yuklab olingan fayllar |
+| `results/` | Natijalar |
+
+---
+
+## 🧪 Testlar
+
+```bash
+python -m pytest -q
+python tests/run_tests.py
+```
+
+---
+
+## 🎉 Izoh
+
+Loyiha WAN muhitida barqaror ishlashi uchun optimallashtirilgan: asinxron DB yozish, dublikatlarga qarshi barqaror normalizatsiya, uploader tezligi uchun Telethon tuning. Qo‘shimcha batafsil hujjatlar `info/` papkasida.
+
+# 🎬 Files Project Scraper
+
 > Professional multi-modulli fayl scraping, download va Telegram upload tizimi - Zamonaviy interaktiv menu bilan
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
