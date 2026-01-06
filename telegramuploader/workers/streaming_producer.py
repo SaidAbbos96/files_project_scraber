@@ -100,8 +100,8 @@ class StreamingProducer:
             if success:
                 logger.info(f"✅ Streaming muvaffaqiyatli: {file_info['title']}")
                 
-                # DB ni yangilash
-                db.mark_file_uploaded(file_info["id"])
+                # DB ni yangilash (uploaded=True, uploaded_at auto-set)
+                db.update_file(file_info["id"], uploaded=True)
                 
                 # Notification - upload tugadi
                 if not self._quiet_mode:
